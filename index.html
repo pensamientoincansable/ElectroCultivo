@@ -1,0 +1,1965 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ElectroCultivo España - Juego de Agricultura</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Fredoka+One&family=Nunito:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        * { font-family: 'Nunito', sans-serif; }
+        .title-font { font-family: 'Fredoka One', cursive; }
+        
+        .region { transition: all 0.3s; cursor: pointer; }
+        .region:hover { filter: brightness(1.2); transform: scale(1.02); }
+        .region.locked { filter: grayscale(70%) opacity(0.7); cursor: not-allowed; }
+        .region.locked:hover { transform: none; filter: grayscale(70%) opacity(0.7); }
+        .region.current { stroke: #ffd700; stroke-width: 4; filter: drop-shadow(0 0 10px #ffd700); }
+        
+        .crop-cell { 
+            transition: all 0.2s;
+            background: linear-gradient(145deg, #8B4513 0%, #654321 100%);
+            border: 3px solid #5a3a1a;
+        }
+        .crop-cell:hover { transform: scale(1.08); box-shadow: 0 0 15px rgba(255,255,255,0.3); }
+        .crop-cell.planted { animation: grow 0.5s ease-out; }
+        
+        @keyframes grow {
+            0% { transform: scale(0.8); }
+            100% { transform: scale(1); }
+        }
+        
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); box-shadow: 0 0 10px #4ade80; }
+            50% { transform: scale(1.1); box-shadow: 0 0 25px #4ade80; }
+        }
+        
+        .ready-harvest { animation: pulse 1s infinite; }
+        
+        @keyframes float {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-10px); }
+        }
+        
+        .float-animation { animation: float 3s ease-in-out infinite; }
+        
+        .electroculture-active {
+            box-shadow: 0 0 20px #00ff88, 0 0 40px #00ff8855;
+        }
+        
+        @keyframes spark {
+            0%, 100% { opacity: 0.3; }
+            50% { opacity: 1; }
+        }
+        
+        .spark { animation: spark 0.5s infinite; }
+        
+        .guide-bubble {
+            position: relative;
+            background: linear-gradient(135deg, #ffffff 0%, #f0f0f0 100%);
+            border-radius: 20px;
+            border: 3px solid #8B4513;
+        }
+        .guide-bubble::after {
+            content: '';
+            position: absolute;
+            bottom: -20px;
+            left: 30px;
+            border: 10px solid transparent;
+            border-top-color: #8B4513;
+        }
+        
+        .season-spring { background: linear-gradient(135deg, #a8e063 0%, #56ab2f 100%); }
+        .season-summer { background: linear-gradient(135deg, #f5af19 0%, #f12711 100%); }
+        .season-autumn { background: linear-gradient(135deg, #c2772e 0%, #8B4513 100%); }
+        .season-winter { background: linear-gradient(135deg, #83a4d4 0%, #b6fbff 100%); }
+        
+        .modal-overlay {
+            background: rgba(0,0,0,0.8);
+            backdrop-filter: blur(8px);
+        }
+        
+        .fullscreen-view {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            z-index: 100;
+            overflow-y: auto;
+        }
+        
+        .farm-background {
+            background: linear-gradient(180deg, 
+                #87CEEB 0%, 
+                #87CEEB 40%, 
+                #98D8AA 40%, 
+                #4a7c3f 100%);
+        }
+        
+        .farm-background.season-winter-bg {
+            background: linear-gradient(180deg, 
+                #b8c6d4 0%, 
+                #d4e5f7 40%, 
+                #e8f4e8 40%, 
+                #c9d9c5 100%);
+        }
+        
+        .farm-background.season-autumn-bg {
+            background: linear-gradient(180deg, 
+                #d4a574 0%, 
+                #e8c49a 40%, 
+                #c4a265 40%, 
+                #8B6914 100%);
+        }
+        
+        .farm-background.season-summer-bg {
+            background: linear-gradient(180deg, 
+                #4a90c2 0%, 
+                #87CEEB 40%, 
+                #7cb342 40%, 
+                #558b2f 100%);
+        }
+        
+        /* Minijuego */
+        .minigame-container {
+            position: relative;
+            width: 100%;
+            height: 400px;
+            background: linear-gradient(180deg, #87CEEB 0%, #4a7c3f 100%);
+            border-radius: 20px;
+            overflow: hidden;
+        }
+        
+        .falling-item {
+            position: absolute;
+            font-size: 2rem;
+            cursor: pointer;
+            transition: transform 0.1s;
+            user-select: none;
+        }
+        
+        .falling-item:hover {
+            transform: scale(1.3);
+        }
+        
+        .basket {
+            position: absolute;
+            bottom: 10px;
+            font-size: 3rem;
+            transition: left 0.1s;
+        }
+        
+        @keyframes catchEffect {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.5); }
+            100% { transform: scale(0); opacity: 0; }
+        }
+        
+        .caught {
+            animation: catchEffect 0.3s forwards;
+        }
+        
+        /* Mapa mejorado */
+        .spain-border {
+            fill: none;
+            stroke: #1a3d18;
+            stroke-width: 3;
+        }
+        
+        .region-border {
+            stroke: #2d5a27;
+            stroke-width: 1.5;
+        }
+        
+        .water {
+            fill: #4a90c2;
+        }
+        
+        /* Tutorial overlay */
+        .tutorial-highlight {
+            box-shadow: 0 0 0 9999px rgba(0,0,0,0.7), 0 0 20px 5px #ffd700;
+            border-radius: 10px;
+            position: relative;
+            z-index: 1000;
+        }
+    </style>
+</head>
+<body class="bg-gradient-to-br from-green-800 via-green-700 to-emerald-900 min-h-screen overflow-x-hidden">
+    <!-- Pantalla de Inicio -->
+    <div id="startScreen" class="fixed inset-0 flex items-center justify-center z-50 bg-gradient-to-br from-amber-700 via-green-800 to-emerald-900">
+        <div class="text-center p-8 max-w-2xl">
+            <div class="mb-8">
+                <span class="text-8xl inline-block animate-bounce" style="animation-delay: 0s;">🌾</span>
+                <span class="text-8xl inline-block animate-bounce" style="animation-delay: 0.2s;">⚡</span>
+                <span class="text-8xl inline-block animate-bounce" style="animation-delay: 0.4s;">🌻</span>
+            </div>
+            <h1 class="title-font text-5xl md:text-6xl text-yellow-300 mb-4 drop-shadow-lg">ElectroCultivo España</h1>
+            <p class="text-xl text-green-200 mb-8">Aprende las técnicas ancestrales de la electrocultura<br>mientras recorres las regiones agrícolas de España</p>
+            
+            <div class="bg-black/30 rounded-xl p-4 mb-6 text-left">
+                <p class="text-amber-300 font-bold mb-2">🎮 Cómo jugar:</p>
+                <ul class="text-green-200 text-sm space-y-1">
+                    <li>🗺️ Explora las regiones de España y desbloquea nuevas zonas</li>
+                    <li>🌱 Planta cultivos según la temporada de cada región</li>
+                    <li>⚡ Aprende electrocultura para mejorar tus cosechas</li>
+                    <li>🎯 Juega minijuegos para ganar energía y dinero extra</li>
+                    <li>👨‍🌾 Sigue los consejos de Pedro, tu mentor agricultor</li>
+                </ul>
+            </div>
+            
+            <button onclick="startGame()" class="bg-yellow-500 hover:bg-yellow-400 text-amber-900 font-bold text-2xl px-12 py-4 rounded-full shadow-xl transform hover:scale-105 transition-all">
+                🚜 Comenzar Aventura
+            </button>
+            <p class="text-green-300 mt-6 text-sm">Comenzarás en Otoño, la mejor época para sembrar en Castilla-La Mancha</p>
+        </div>
+    </div>
+
+    <!-- Contenedor Principal del Juego -->
+    <div id="gameContainer" class="hidden">
+        <!-- Barra Superior Fija -->
+        <header class="bg-gradient-to-r from-amber-900 to-amber-800 p-3 shadow-xl sticky top-0 z-50">
+            <div class="container mx-auto flex justify-between items-center flex-wrap gap-2">
+                <div class="flex items-center gap-4">
+                    <h1 class="title-font text-xl md:text-2xl text-yellow-300 cursor-pointer" onclick="showView('map')">🌾 ElectroCultivo</h1>
+                    <div id="seasonIndicator" class="px-3 py-1 rounded-full text-white font-bold text-sm season-autumn">
+                        🍂 Otoño
+                    </div>
+                </div>
+                <div class="flex gap-2 md:gap-4 items-center flex-wrap">
+                    <div class="bg-amber-950 px-3 py-1 rounded-lg flex items-center gap-1">
+                        <span class="text-xl">💰</span>
+                        <span id="money" class="text-yellow-400 font-bold text-lg">500</span>
+                    </div>
+                    <div class="bg-amber-950 px-3 py-1 rounded-lg flex items-center gap-1">
+                        <span class="text-xl">⚡</span>
+                        <span id="energy" class="text-blue-400 font-bold text-lg">100</span>
+                    </div>
+                    <div class="bg-amber-950 px-3 py-1 rounded-lg flex items-center gap-1">
+                        <span class="text-xl">⭐</span>
+                        <span id="level" class="text-green-400 font-bold text-lg">1</span>
+                    </div>
+                    <div class="bg-amber-950 px-3 py-1 rounded-lg hidden md:block">
+                        <span class="text-white text-sm">XP: </span>
+                        <span id="xp" class="text-purple-400 font-bold">0</span>/<span id="xpNeeded" class="text-purple-300">100</span>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <!-- Navegación Principal -->
+        <nav class="bg-amber-800/90 p-2 sticky top-14 z-40">
+            <div class="container mx-auto flex gap-2 justify-center flex-wrap">
+                <button onclick="showView('map')" id="navMap" class="nav-btn bg-green-700 hover:bg-green-600 text-white px-4 md:px-6 py-2 rounded-lg font-bold transition-all flex items-center gap-1">
+                    <span>🗺️</span><span class="hidden sm:inline">Mapa</span>
+                </button>
+                <button onclick="showView('farm')" id="navFarm" class="nav-btn bg-amber-700 hover:bg-amber-600 text-white px-4 md:px-6 py-2 rounded-lg font-bold transition-all flex items-center gap-1">
+                    <span>🌱</span><span class="hidden sm:inline">Granja</span>
+                </button>
+                <button onclick="showView('minigame')" id="navMinigame" class="nav-btn bg-pink-700 hover:bg-pink-600 text-white px-4 md:px-6 py-2 rounded-lg font-bold transition-all flex items-center gap-1">
+                    <span>🎮</span><span class="hidden sm:inline">Minijuegos</span>
+                </button>
+                <button onclick="showView('shop')" id="navShop" class="nav-btn bg-blue-700 hover:bg-blue-600 text-white px-4 md:px-6 py-2 rounded-lg font-bold transition-all flex items-center gap-1">
+                    <span>🛒</span><span class="hidden sm:inline">Tienda</span>
+                </button>
+                <button onclick="showView('electroculture')" id="navElectro" class="nav-btn bg-yellow-600 hover:bg-yellow-500 text-white px-4 md:px-6 py-2 rounded-lg font-bold transition-all flex items-center gap-1">
+                    <span>⚡</span><span class="hidden sm:inline">Electro</span>
+                </button>
+            </div>
+        </nav>
+
+        <!-- Vista del Mapa de España -->
+        <div id="mapView" class="container mx-auto p-4">
+            <div class="text-center mb-6">
+                <h2 class="title-font text-3xl text-yellow-300 mb-2">🗺️ Regiones Agrícolas de España</h2>
+                <p class="text-green-200">Selecciona una región desbloqueada para cultivar. Sube de nivel para desbloquear más.</p>
+                <div class="mt-3 inline-flex items-center gap-2 bg-amber-900/50 px-4 py-2 rounded-full">
+                    <span class="text-yellow-300 font-bold">Regiones desbloqueadas:</span>
+                    <span id="unlockedCount" class="text-white text-xl font-bold">1 / 15</span>
+                </div>
+            </div>
+            
+            <div class="grid grid-cols-1 xl:grid-cols-4 gap-6">
+                <!-- Mapa Visual Mejorado -->
+                <div class="xl:col-span-3 bg-gradient-to-b from-blue-400 to-blue-600 rounded-2xl p-4 shadow-2xl">
+                    <div class="relative w-full bg-blue-500 rounded-xl overflow-hidden" style="padding-bottom: 70%;">
+                        <svg viewBox="0 0 800 560" class="absolute inset-0 w-full h-full">
+                            <!-- Fondo de agua (Mar Mediterráneo y Atlántico) -->
+                            <rect x="0" y="0" width="800" height="560" fill="#3b82c8"/>
+                            
+                            <!-- Península Ibérica base -->
+                            <path d="M100,120 L200,80 L350,70 L500,65 L600,80 L720,100 L750,180 L740,280 L720,350 L680,420 L600,470 L500,490 L400,485 L300,470 L200,440 L120,400 L80,350 L60,280 L70,200 Z" fill="#d4a574" stroke="#1a3d18" stroke-width="4"/>
+                            
+                            <!-- Portugal (referencia) -->
+                            <path d="M60,200 L100,180 L120,220 L130,300 L120,380 L100,420 L70,400 L50,340 L50,260 Z" fill="#c9b896" stroke="#1a3d18" stroke-width="2"/>
+                            <text x="85" y="300" fill="#666" font-size="12" text-anchor="middle">Portugal</text>
+                            
+                            <!-- Francia (referencia) -->
+                            <path d="M600,30 L750,20 L780,80 L750,100 L720,100 L600,80 L580,50 Z" fill="#c9b896" stroke="#1a3d18" stroke-width="2"/>
+                            <text x="680" y="60" fill="#666" font-size="12" text-anchor="middle">Francia</text>
+                            
+                            <!-- REGIONES DE ESPAÑA -->
+                            
+                            <!-- Galicia -->
+                            <path id="region-galicia" class="region locked" 
+                                d="M100,120 L180,100 L200,130 L190,180 L150,200 L110,190 L90,160 Z" 
+                                fill="#2d7a27" stroke="#1a3d18" stroke-width="2" onclick="selectRegion('galicia')"/>
+                            <text x="145" y="155" fill="white" font-size="11" text-anchor="middle" font-weight="bold" style="pointer-events:none">Galicia</text>
+                            
+                            <!-- Asturias -->
+                            <path id="region-asturias" class="region locked" 
+                                d="M180,100 L280,85 L300,110 L280,140 L200,150 L190,130 Z" 
+                                fill="#3d8a37" stroke="#1a3d18" stroke-width="2" onclick="selectRegion('asturias')"/>
+                            <text x="240" y="118" fill="white" font-size="10" text-anchor="middle" font-weight="bold" style="pointer-events:none">Asturias</text>
+                            
+                            <!-- Cantabria -->
+                            <path id="region-cantabria" class="region locked" 
+                                d="M300,85 L380,75 L395,100 L370,125 L300,130 L300,110 Z" 
+                                fill="#4a9a47" stroke="#1a3d18" stroke-width="2" onclick="selectRegion('cantabria')"/>
+                            <text x="345" y="105" fill="white" font-size="9" text-anchor="middle" font-weight="bold" style="pointer-events:none">Cantabria</text>
+                            
+                            <!-- País Vasco -->
+                            <path id="region-paisvasco" class="region locked" 
+                                d="M380,75 L440,70 L460,95 L440,120 L395,115 L395,100 Z" 
+                                fill="#5aaa57" stroke="#1a3d18" stroke-width="2" onclick="selectRegion('paisvasco')"/>
+                            <text x="420" y="95" fill="white" font-size="8" text-anchor="middle" font-weight="bold" style="pointer-events:none">P.Vasco</text>
+                            
+                            <!-- Navarra -->
+                            <path id="region-navarra" class="region locked" 
+                                d="M440,70 L520,65 L550,100 L520,140 L460,130 L460,95 Z" 
+                                fill="#4a8540" stroke="#1a3d18" stroke-width="2" onclick="selectRegion('navarra')"/>
+                            <text x="500" y="105" fill="white" font-size="10" text-anchor="middle" font-weight="bold" style="pointer-events:none">Navarra</text>
+                            
+                            <!-- La Rioja -->
+                            <path id="region-larioja" class="region locked" 
+                                d="M370,125 L440,120 L460,130 L460,165 L400,175 L370,155 Z" 
+                                fill="#8a4a9a" stroke="#1a3d18" stroke-width="2" onclick="selectRegion('larioja')"/>
+                            <text x="415" y="150" fill="white" font-size="9" text-anchor="middle" font-weight="bold" style="pointer-events:none">La Rioja</text>
+                            
+                            <!-- Aragón -->
+                            <path id="region-aragon" class="region locked" 
+                                d="M460,130 L550,100 L620,120 L640,200 L620,300 L540,320 L480,280 L460,200 Z" 
+                                fill="#9a7a40" stroke="#1a3d18" stroke-width="2" onclick="selectRegion('aragon')"/>
+                            <text x="550" y="210" fill="white" font-size="14" text-anchor="middle" font-weight="bold" style="pointer-events:none">Aragón</text>
+                            
+                            <!-- Cataluña -->
+                            <path id="region-cataluna" class="region locked" 
+                                d="M620,80 L720,100 L740,180 L720,280 L640,300 L620,200 L640,120 Z" 
+                                fill="#4a7a4a" stroke="#1a3d18" stroke-width="2" onclick="selectRegion('cataluna')"/>
+                            <text x="680" y="190" fill="white" font-size="12" text-anchor="middle" font-weight="bold" style="pointer-events:none">Cataluña</text>
+                            
+                            <!-- Castilla y León -->
+                            <path id="region-castillayleon" class="region locked" 
+                                d="M150,180 L280,140 L370,140 L400,175 L420,240 L380,300 L280,320 L180,300 L130,250 L130,220 Z" 
+                                fill="#aa8a30" stroke="#1a3d18" stroke-width="2" onclick="selectRegion('castillayleon')"/>
+                            <text x="270" y="230" fill="white" font-size="12" text-anchor="middle" font-weight="bold" style="pointer-events:none">Castilla y León</text>
+                            
+                            <!-- Madrid -->
+                            <path id="region-madrid" class="region locked" 
+                                d="M320,290 L380,280 L400,320 L370,360 L320,340 Z" 
+                                fill="#ba5a5a" stroke="#1a3d18" stroke-width="2" onclick="selectRegion('madrid')"/>
+                            <text x="355" y="325" fill="white" font-size="9" text-anchor="middle" font-weight="bold" style="pointer-events:none">Madrid</text>
+                            
+                            <!-- Castilla-La Mancha (Desbloqueada - Nivel 1) -->
+                            <path id="region-castillalamancha" class="region" 
+                                d="M280,320 L420,280 L540,320 L560,380 L520,440 L380,450 L300,420 L270,360 Z" 
+                                fill="#d4a030" stroke="#1a3d18" stroke-width="2" onclick="selectRegion('castillalamancha')"/>
+                            <text x="410" y="370" fill="white" font-size="11" text-anchor="middle" font-weight="bold" style="pointer-events:none">Castilla-La Mancha</text>
+                            
+                            <!-- Extremadura -->
+                            <path id="region-extremadura" class="region locked" 
+                                d="M120,280 L180,300 L270,340 L280,400 L240,450 L160,450 L100,400 L90,340 Z" 
+                                fill="#5a9a40" stroke="#1a3d18" stroke-width="2" onclick="selectRegion('extremadura')"/>
+                            <text x="180" y="380" fill="white" font-size="11" text-anchor="middle" font-weight="bold" style="pointer-events:none">Extremadura</text>
+                            
+                            <!-- Valencia -->
+                            <path id="region-valencia" class="region locked" 
+                                d="M540,320 L640,280 L680,340 L660,420 L600,450 L540,420 L550,380 Z" 
+                                fill="#f4a020" stroke="#1a3d18" stroke-width="2" onclick="selectRegion('valencia')"/>
+                            <text x="610" y="370" fill="white" font-size="11" text-anchor="middle" font-weight="bold" style="pointer-events:none">Valencia</text>
+                            
+                            <!-- Murcia -->
+                            <path id="region-murcia" class="region locked" 
+                                d="M540,420 L600,450 L620,490 L560,500 L500,470 L520,440 Z" 
+                                fill="#e07020" stroke="#1a3d18" stroke-width="2" onclick="selectRegion('murcia')"/>
+                            <text x="560" y="470" fill="white" font-size="10" text-anchor="middle" font-weight="bold" style="pointer-events:none">Murcia</text>
+                            
+                            <!-- Andalucía -->
+                            <path id="region-andalucia" class="region locked" 
+                                d="M100,400 L240,450 L380,450 L500,470 L540,500 L480,530 L300,530 L150,500 L80,450 L80,420 Z" 
+                                fill="#30a050" stroke="#1a3d18" stroke-width="2" onclick="selectRegion('andalucia')"/>
+                            <text x="320" y="490" fill="white" font-size="14" text-anchor="middle" font-weight="bold" style="pointer-events:none">Andalucía</text>
+                            
+                            <!-- Islas Baleares -->
+                            <path id="region-baleares" class="region locked" 
+                                d="M700,340 L750,330 L770,360 L760,390 L720,400 L700,370 Z" 
+                                fill="#20a0a0" stroke="#1a3d18" stroke-width="2" onclick="selectRegion('baleares')"/>
+                            <text x="735" y="365" fill="white" font-size="8" text-anchor="middle" font-weight="bold" style="pointer-events:none">Baleares</text>
+                            
+                            <!-- Leyenda -->
+                            <rect x="20" y="480" width="150" height="70" fill="rgba(0,0,0,0.5)" rx="10"/>
+                            <text x="95" y="500" fill="#ffd700" font-size="10" text-anchor="middle" font-weight="bold">LEYENDA</text>
+                            <rect x="30" y="510" width="15" height="15" fill="#d4a030"/>
+                            <text x="50" y="522" fill="white" font-size="9">Desbloqueada</text>
+                            <rect x="30" y="530" width="15" height="15" fill="#666" opacity="0.7"/>
+                            <text x="50" y="542" fill="white" font-size="9">Bloqueada</text>
+                            
+                        </svg>
+                    </div>
+                </div>
+                
+                <!-- Panel de Información de Región -->
+                <div class="xl:col-span-1 space-y-4">
+                    <div id="regionInfo" class="bg-amber-900/80 rounded-2xl p-5">
+                        <h3 class="title-font text-xl text-yellow-300 mb-3">📍 Selecciona una Región</h3>
+                        <p class="text-green-200 text-sm">Haz clic en una región del mapa para ver sus cultivos y características.</p>
+                    </div>
+                    
+                    <div class="bg-amber-900/80 rounded-2xl p-5">
+                        <h3 class="title-font text-lg text-yellow-300 mb-3">📅 Temporada Actual</h3>
+                        <div id="seasonInfoPanel" class="bg-amber-950/50 rounded-xl p-3">
+                            <p class="text-2xl text-center mb-2">🍂</p>
+                            <p class="text-white text-center font-bold">Otoño</p>
+                            <p class="text-amber-300 text-xs text-center mt-1">Ideal para cereales y legumbres</p>
+                        </div>
+                    </div>
+                    
+                    <div class="bg-amber-900/80 rounded-2xl p-5">
+                        <h3 class="title-font text-lg text-yellow-300 mb-3">🏆 Progreso</h3>
+                        <div class="space-y-2">
+                            <div class="flex justify-between text-sm">
+                                <span class="text-green-200">Nivel</span>
+                                <span id="levelProgress" class="text-white font-bold">1</span>
+                            </div>
+                            <div class="w-full bg-gray-700 rounded-full h-3">
+                                <div id="xpBar" class="bg-purple-500 h-3 rounded-full transition-all" style="width: 0%"></div>
+                            </div>
+                            <p class="text-gray-400 text-xs text-center">XP: <span id="xpProgress">0</span>/<span id="xpNeededProgress">100</span></p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Vista de Granja (Pantalla Completa) -->
+        <div id="farmView" class="hidden">
+            <div id="farmFullscreen" class="fullscreen-view farm-background season-autumn-bg">
+                <!-- Cabecera de la Granja -->
+                <div class="bg-gradient-to-r from-amber-900/95 to-amber-800/95 p-3 sticky top-0 z-10">
+                    <div class="container mx-auto flex justify-between items-center flex-wrap gap-2">
+                        <div class="flex items-center gap-3">
+                            <button onclick="showView('map')" class="bg-gray-700 hover:bg-gray-600 text-white px-3 py-2 rounded-lg">
+                                ← Volver
+                            </button>
+                            <div>
+                                <h2 class="title-font text-xl text-yellow-300" id="farmRegionTitle">🌾 Granja de Castilla-La Mancha</h2>
+                                <p class="text-green-200 text-sm">📅 Día <span id="currentDay">1</span> | <span id="currentSeasonText">🍂 Otoño</span> | Año <span id="currentYear">1</span></p>
+                            </div>
+                        </div>
+                        <div class="flex gap-2 items-center flex-wrap">
+                            <div id="electrocultureStatus" class="bg-gray-700 px-3 py-1 rounded-lg text-sm">
+                                <span class="text-gray-400">⚡ Electrocultura: Inactiva</span>
+                            </div>
+                            <button onclick="advanceDay()" class="bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded-lg font-bold flex items-center gap-1">
+                                ⏭️ Pasar Día
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Contenido Principal de la Granja -->
+                <div class="container mx-auto p-4">
+                    <div class="grid grid-cols-1 lg:grid-cols-5 gap-4">
+                        <!-- Campo de Cultivo (Principal) -->
+                        <div class="lg:col-span-4">
+                            <div class="bg-amber-900/40 backdrop-blur-sm rounded-2xl p-4 md:p-6">
+                                <div class="flex justify-between items-center mb-4 flex-wrap gap-2">
+                                    <h3 class="text-white font-bold text-lg">🌾 Campo de Cultivo</h3>
+                                    <div class="flex gap-2 flex-wrap">
+                                        <button onclick="waterAll()" class="bg-blue-600 hover:bg-blue-500 text-white px-3 py-1 rounded-lg text-sm font-bold flex items-center gap-1">
+                                            💧 Regar Todo
+                                        </button>
+                                        <button onclick="harvestAll()" class="bg-amber-600 hover:bg-amber-500 text-white px-3 py-1 rounded-lg text-sm font-bold flex items-center gap-1">
+                                            🌾 Cosechar Todo
+                                        </button>
+                                    </div>
+                                </div>
+                                
+                                <div id="farmGrid" class="grid grid-cols-4 sm:grid-cols-5 md:grid-cols-6 lg:grid-cols-8 gap-2 md:gap-3">
+                                    <!-- Parcelas generadas dinámicamente -->
+                                </div>
+                                
+                                <div class="mt-4 flex gap-2 flex-wrap justify-center">
+                                    <button onclick="expandFarm()" class="bg-green-700 hover:bg-green-600 text-white px-4 py-2 rounded-lg font-bold">
+                                        ➕ Expandir Granja (500💰)
+                                    </button>
+                                </div>
+                            </div>
+                            
+                            <!-- Instrucciones rápidas -->
+                            <div class="mt-4 bg-black/30 rounded-xl p-4 text-center">
+                                <p class="text-green-200 text-sm">
+                                    <span class="text-yellow-300 font-bold">💡 Consejo:</span> 
+                                    Haz clic en una parcela vacía (+) para plantar. Haz clic en un cultivo listo (brillando) para cosechar.
+                                </p>
+                            </div>
+                        </div>
+                        
+                        <!-- Panel Lateral - Semillas -->
+                        <div class="lg:col-span-1">
+                            <div class="bg-amber-900/80 backdrop-blur-sm rounded-2xl p-4 sticky top-32">
+                                <h3 class="title-font text-lg text-yellow-300 mb-3">🌱 Mis Semillas</h3>
+                                <div id="seedList" class="space-y-2 max-h-64 overflow-y-auto">
+                                    <!-- Semillas dinámicas -->
+                                </div>
+                                <button onclick="showView('shop')" class="mt-3 w-full bg-blue-600 hover:bg-blue-500 text-white py-2 rounded-lg text-sm font-bold">
+                                    🛒 Comprar Semillas
+                                </button>
+                                
+                                <!-- Inventario rápido -->
+                                <div class="mt-4 pt-4 border-t border-amber-700">
+                                    <h4 class="text-amber-300 font-bold text-sm mb-2">📦 Cosechas</h4>
+                                    <div id="quickInventory" class="space-y-1 max-h-32 overflow-y-auto text-sm">
+                                        <p class="text-gray-400">Sin cosechas</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Vista de Minijuegos -->
+        <div id="minigameView" class="container mx-auto p-4 hidden">
+            <div class="text-center mb-6">
+                <h2 class="title-font text-3xl text-yellow-300 mb-2">🎮 Minijuegos del Campo</h2>
+                <p class="text-green-200">¡Gana dinero y energía extra jugando!</p>
+            </div>
+            
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-4xl mx-auto">
+                <!-- Minijuego 1: Atrapa la Cosecha -->
+                <div class="bg-gradient-to-br from-green-900/80 to-emerald-900/80 rounded-2xl p-6">
+                    <h3 class="title-font text-2xl text-yellow-300 mb-2">🧺 Atrapa la Cosecha</h3>
+                    <p class="text-green-200 text-sm mb-4">Recoge las frutas y verduras que caen. ¡Evita las piedras!</p>
+                    <div class="bg-black/30 rounded-xl p-3 mb-4">
+                        <p class="text-amber-300 text-sm">Recompensa: <span class="text-white font-bold">+5💰 por fruta</span></p>
+                        <p class="text-amber-300 text-sm">Coste: <span class="text-white font-bold">10⚡</span></p>
+                    </div>
+                    <button onclick="startMinigame('catch')" class="w-full bg-green-600 hover:bg-green-500 text-white py-3 rounded-xl font-bold text-lg">
+                        🎯 Jugar
+                    </button>
+                </div>
+                
+                <!-- Minijuego 2: Elimina las Plagas -->
+                <div class="bg-gradient-to-br from-red-900/80 to-orange-900/80 rounded-2xl p-6">
+                    <h3 class="title-font text-2xl text-yellow-300 mb-2">🐛 Elimina Plagas</h3>
+                    <p class="text-green-200 text-sm mb-4">Haz clic en los insectos antes de que se coman tus cultivos.</p>
+                    <div class="bg-black/30 rounded-xl p-3 mb-4">
+                        <p class="text-amber-300 text-sm">Recompensa: <span class="text-white font-bold">+3💰 por plaga</span></p>
+                        <p class="text-amber-300 text-sm">Coste: <span class="text-white font-bold">5⚡</span></p>
+                    </div>
+                    <button onclick="startMinigame('pest')" class="w-full bg-red-600 hover:bg-red-500 text-white py-3 rounded-xl font-bold text-lg">
+                        🎯 Jugar
+                    </button>
+                </div>
+                
+                <!-- Minijuego 3: Riego Rápido -->
+                <div class="bg-gradient-to-br from-blue-900/80 to-cyan-900/80 rounded-2xl p-6">
+                    <h3 class="title-font text-2xl text-yellow-300 mb-2">💧 Riego Rápido</h3>
+                    <p class="text-green-200 text-sm mb-4">Riega todas las plantas antes de que se marchiten.</p>
+                    <div class="bg-black/30 rounded-xl p-3 mb-4">
+                        <p class="text-amber-300 text-sm">Recompensa: <span class="text-white font-bold">+20⚡</span></p>
+                        <p class="text-amber-300 text-sm">Coste: <span class="text-white font-bold">Gratis</span></p>
+                    </div>
+                    <button onclick="startMinigame('water')" class="w-full bg-blue-600 hover:bg-blue-500 text-white py-3 rounded-xl font-bold text-lg">
+                        🎯 Jugar
+                    </button>
+                </div>
+                
+                <!-- Minijuego 4: Electrocultura -->
+                <div class="bg-gradient-to-br from-purple-900/80 to-yellow-900/80 rounded-2xl p-6">
+                    <h3 class="title-font text-2xl text-yellow-300 mb-2">⚡ Carga Eléctrica</h3>
+                    <p class="text-green-200 text-sm mb-4">Conecta los cables para activar la electrocultura.</p>
+                    <div class="bg-black/30 rounded-xl p-3 mb-4">
+                        <p class="text-amber-300 text-sm">Recompensa: <span class="text-white font-bold">+50⚡ +30💰</span></p>
+                        <p class="text-amber-300 text-sm">Coste: <span class="text-white font-bold">15⚡</span></p>
+                    </div>
+                    <button onclick="startMinigame('electric')" class="w-full bg-purple-600 hover:bg-purple-500 text-white py-3 rounded-xl font-bold text-lg">
+                        🎯 Jugar
+                    </button>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Modal de Minijuego -->
+        <div id="minigameModal" class="fixed inset-0 z-50 hidden">
+            <div class="modal-overlay absolute inset-0"></div>
+            <div class="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-gradient-to-br from-green-900 to-emerald-800 rounded-2xl p-6 max-w-2xl w-full mx-4 shadow-2xl">
+                <div class="flex justify-between items-center mb-4">
+                    <h3 id="minigameTitle" class="title-font text-2xl text-yellow-300">🎮 Minijuego</h3>
+                    <div class="flex items-center gap-4">
+                        <div class="bg-black/30 px-3 py-1 rounded-lg">
+                            <span class="text-yellow-300">Puntos: </span>
+                            <span id="minigameScore" class="text-white font-bold">0</span>
+                        </div>
+                        <div class="bg-black/30 px-3 py-1 rounded-lg">
+                            <span class="text-blue-300">Tiempo: </span>
+                            <span id="minigameTimer" class="text-white font-bold">30</span>s
+                        </div>
+                    </div>
+                </div>
+                <div id="minigameArea" class="minigame-container">
+                    <!-- Área del minijuego -->
+                </div>
+                <div class="mt-4 flex justify-center gap-4">
+                    <button onclick="closeMinigame()" class="bg-red-600 hover:bg-red-500 text-white px-6 py-2 rounded-lg font-bold">
+                        ✕ Salir
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Vista de Tienda -->
+        <div id="shopView" class="container mx-auto p-4 hidden">
+            <div class="text-center mb-6">
+                <h2 class="title-font text-3xl text-yellow-300 mb-2">🛒 Tienda del Pueblo</h2>
+                <p class="text-green-200">Compra semillas, herramientas y vende tus cosechas</p>
+            </div>
+            
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                <!-- Semillas -->
+                <div class="bg-amber-900/80 rounded-2xl p-5">
+                    <h3 class="title-font text-xl text-green-300 mb-4">🌱 Semillas</h3>
+                    <p class="text-amber-300 text-sm mb-3">Región: <span id="shopRegionName">Castilla-La Mancha</span></p>
+                    <div id="shopSeeds" class="space-y-2 max-h-80 overflow-y-auto">
+                        <!-- Semillas disponibles -->
+                    </div>
+                </div>
+                
+                <!-- Herramientas -->
+                <div class="bg-amber-900/80 rounded-2xl p-5">
+                    <h3 class="title-font text-xl text-blue-300 mb-4">🔧 Herramientas</h3>
+                    <div id="shopTools" class="space-y-2">
+                        <!-- Herramientas -->
+                    </div>
+                </div>
+                
+                <!-- Electrocultura -->
+                <div class="bg-amber-900/80 rounded-2xl p-5">
+                    <h3 class="title-font text-xl text-yellow-300 mb-4">⚡ Equipos de Electrocultura</h3>
+                    <div id="shopElectro" class="space-y-2">
+                        <!-- Equipos -->
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Vender Cosechas -->
+            <div class="mt-6 bg-amber-900/80 rounded-2xl p-5">
+                <h3 class="title-font text-xl text-amber-300 mb-4">💰 Vender Cosechas</h3>
+                <div id="sellSection" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
+                    <p class="text-gray-400 col-span-full text-center py-4">No tienes cosechas para vender</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Vista de Electrocultura -->
+        <div id="electrocultureView" class="container mx-auto p-4 hidden">
+            <div class="text-center mb-6">
+                <h2 class="title-font text-3xl text-yellow-300 mb-2">⚡ Centro de Electrocultura</h2>
+                <p class="text-green-200">Aprende y aplica técnicas de electricidad para mejorar tus cultivos</p>
+            </div>
+            
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <!-- Técnicas -->
+                <div class="bg-gradient-to-br from-purple-900/80 to-blue-900/80 rounded-2xl p-6">
+                    <h3 class="title-font text-xl text-yellow-300 mb-4">📚 Técnicas Disponibles</h3>
+                    <div id="electroTechniques" class="space-y-3">
+                        <!-- Técnicas -->
+                    </div>
+                </div>
+                
+                <!-- Beneficios y Info -->
+                <div class="space-y-4">
+                    <div class="bg-gradient-to-br from-green-900/80 to-emerald-900/80 rounded-2xl p-6">
+                        <h3 class="title-font text-xl text-green-300 mb-4">✨ Beneficios Activos</h3>
+                        <div id="activeBenefits" class="space-y-2">
+                            <p class="text-gray-400">Compra equipos de electrocultura para ver sus beneficios.</p>
+                        </div>
+                    </div>
+                    
+                    <div class="bg-black/40 rounded-2xl p-6">
+                        <h4 class="text-yellow-300 font-bold mb-3">📖 ¿Qué es la Electrocultura?</h4>
+                        <p class="text-green-200 text-sm leading-relaxed">
+                            La electrocultura es una práctica agrícola ancestral que utiliza la electricidad atmosférica y campos electromagnéticos naturales para estimular el crecimiento de las plantas. 
+                            Técnicas como las antenas de cobre, los polos magnéticos y la geometría sagrada pueden aumentar significativamente los rendimientos de los cultivos de forma natural y sostenible.
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Guía del Agricultor -->
+        <div id="guidePanel" class="fixed bottom-4 left-4 z-40 max-w-sm">
+            <div class="guide-bubble p-4 shadow-xl">
+                <p id="guideText" class="text-gray-700 text-sm">¡Bienvenido, joven agricultor! Soy Pedro, y llevo 50 años cultivando estas tierras. Es otoño, la mejor época para empezar a sembrar cereales en Castilla-La Mancha. ¡Vamos a la granja!</p>
+            </div>
+            <div class="flex items-end mt-2 gap-2">
+                <div class="text-5xl float-animation">👨‍🌾</div>
+                <div class="flex-1">
+                    <p class="text-yellow-300 font-bold text-sm">Pedro</p>
+                    <p class="text-green-300 text-xs">Agricultor Veterano</p>
+                </div>
+                <button onclick="nextGuideMessage()" class="bg-green-600 hover:bg-green-500 text-white px-3 py-1 rounded-full text-sm">Siguiente</button>
+                <button onclick="hideGuide()" class="bg-red-500 hover:bg-red-400 text-white px-2 py-1 rounded-full text-sm">✕</button>
+            </div>
+        </div>
+        <button id="showGuideBtn" onclick="showGuide()" class="fixed bottom-4 left-4 z-30 bg-amber-600 hover:bg-amber-500 text-white p-3 rounded-full shadow-xl hidden text-2xl">
+            👨‍🌾
+        </button>
+    </div>
+
+    <!-- Modal de Región -->
+    <div id="regionModal" class="fixed inset-0 z-50 hidden">
+        <div class="modal-overlay absolute inset-0" onclick="closeRegionModal()"></div>
+        <div class="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-gradient-to-br from-amber-900 to-amber-800 rounded-2xl p-6 max-w-lg w-full mx-4 shadow-2xl max-h-[90vh] overflow-y-auto">
+            <button onclick="closeRegionModal()" class="absolute top-4 right-4 text-white hover:text-red-400 text-2xl">✕</button>
+            <div id="regionModalContent">
+                <!-- Contenido -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal de Plantación -->
+    <div id="plantModal" class="fixed inset-0 z-50 hidden">
+        <div class="modal-overlay absolute inset-0" onclick="closePlantModal()"></div>
+        <div class="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-gradient-to-br from-green-900 to-green-800 rounded-2xl p-6 max-w-md w-full mx-4 shadow-2xl">
+            <button onclick="closePlantModal()" class="absolute top-4 right-4 text-white hover:text-red-400 text-2xl">✕</button>
+            <h3 class="title-font text-xl text-yellow-300 mb-4">🌱 Selecciona Semilla</h3>
+            <div id="plantModalSeeds" class="space-y-2 max-h-80 overflow-y-auto">
+                <!-- Semillas -->
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ============ DATOS DEL JUEGO ============
+        const gameData = {
+            money: 500,
+            energy: 100,
+            maxEnergy: 100,
+            level: 1,
+            xp: 0,
+            xpNeeded: 100,
+            day: 1,
+            season: 'autumn', // Empezamos en otoño
+            year: 1,
+            currentRegion: 'castillalamancha',
+            unlockedRegions: ['castillalamancha'],
+            farms: {}, // Granjas por región
+            inventory: {
+                seeds: {},
+                harvests: {},
+                tools: { azada: true }
+            },
+            electroculture: {
+                copperAntenna: false,
+                magneticPoles: false,
+                pyramidStructure: false,
+                electroStimulator: false,
+                cosmicAntenna: false
+            },
+            selectedPlotIndex: null,
+            guideMessageIndex: 0
+        };
+
+        // Mensajes del guía tutorial
+        const guideMessages = [
+            "¡Bienvenido, joven agricultor! Soy Pedro, y llevo 50 años cultivando estas tierras. Es otoño, la mejor época para sembrar cereales en Castilla-La Mancha.",
+            "Para empezar, ve a la GRANJA haciendo clic en el botón '🌱 Granja' de arriba. Allí podrás plantar tus primeras semillas.",
+            "Ya te he dado algunas semillas de trigo, cebada y azafrán. El azafrán es el oro de La Mancha, ¡muy valioso!",
+            "Haz clic en una parcela vacía (con el símbolo +) para plantar. Solo puedes plantar cultivos de la temporada actual.",
+            "Recuerda regar tus cultivos con el botón 💧. Los cultivos regados crecen un 50% más rápido.",
+            "Cuando un cultivo esté listo, brillará. Haz clic para cosecharlo y luego véndelo en la TIENDA.",
+            "¡Juega MINIJUEGOS para ganar dinero y energía extra! Los encontrarás en el menú 🎮.",
+            "La ELECTROCULTURA es el secreto de los mejores agricultores. Con el tiempo, podrás comprar equipos que mejoran tus cultivos.",
+            "Sube de nivel cosechando para desbloquear nuevas REGIONES de España, cada una con cultivos únicos.",
+            "¡Buena suerte, joven agricultor! Estaré aquí si me necesitas. Haz clic en mi cara para verme de nuevo."
+        ];
+
+        // Regiones de España
+        const regions = {
+            castillalamancha: {
+                name: 'Castilla-La Mancha',
+                level: 1,
+                description: 'La llanura manchega, tierra de cereales, azafrán y viñedos.',
+                climate: 'Continental seco',
+                crops: ['trigo', 'cebada', 'azafran', 'uva', 'girasol', 'almendra'],
+                emoji: '🌾',
+                farmSize: 12
+            },
+            aragon: {
+                name: 'Aragón',
+                level: 2,
+                description: 'Tierras del Ebro con frutales y cereales de calidad.',
+                climate: 'Continental',
+                crops: ['trigo', 'cebada', 'melocoton', 'cereza', 'olivo', 'almendra', 'maiz'],
+                emoji: '🍑',
+                farmSize: 14
+            },
+            extremadura: {
+                name: 'Extremadura',
+                level: 3,
+                description: 'Dehesas de encinas, olivos y cerezas del Jerte.',
+                climate: 'Mediterráneo continental',
+                crops: ['olivo', 'cereza', 'higo', 'tomate', 'pimiento', 'bellota'],
+                emoji: '🫒',
+                farmSize: 14
+            },
+            larioja: {
+                name: 'La Rioja',
+                level: 4,
+                description: 'Pequeña pero famosa por sus vinos y huertas.',
+                climate: 'Mediterráneo con influencia atlántica',
+                crops: ['uva', 'pimiento', 'champiñon', 'pera', 'manzana', 'esparrago'],
+                emoji: '🍇',
+                farmSize: 10
+            },
+            murcia: {
+                name: 'Murcia',
+                level: 5,
+                description: 'La huerta de Europa, cítricos y hortalizas.',
+                climate: 'Mediterráneo semiárido',
+                crops: ['limon', 'naranja', 'lechuga', 'brocoli', 'alcachofa', 'melon', 'sandia'],
+                emoji: '🍋',
+                farmSize: 16
+            },
+            valencia: {
+                name: 'Valencia',
+                level: 6,
+                description: 'Naranjas, arroz y la fértil huerta valenciana.',
+                climate: 'Mediterráneo',
+                crops: ['naranja', 'arroz', 'chufa', 'tomate', 'kaki', 'albaricoque'],
+                emoji: '🍊',
+                farmSize: 16
+            },
+            cataluna: {
+                name: 'Cataluña',
+                level: 7,
+                description: 'Diversidad desde el Mediterráneo hasta los Pirineos.',
+                climate: 'Mediterráneo y alpino',
+                crops: ['uva', 'avellana', 'manzana', 'pera', 'olivo', 'fresa'],
+                emoji: '🌰',
+                farmSize: 18
+            },
+            castillayleon: {
+                name: 'Castilla y León',
+                level: 8,
+                description: 'El granero de España, legumbres y cereales.',
+                climate: 'Continental',
+                crops: ['trigo', 'cebada', 'lentejas', 'garbanzos', 'remolacha', 'patata', 'girasol'],
+                emoji: '🌻',
+                farmSize: 20
+            },
+            navarra: {
+                name: 'Navarra',
+                level: 9,
+                description: 'Tierra de contrastes, de la Ribera a los Pirineos.',
+                climate: 'Mediterráneo a atlántico',
+                crops: ['esparrago', 'pimiento', 'alcachofa', 'uva', 'melocoton', 'olivo'],
+                emoji: '🫑',
+                farmSize: 16
+            },
+            paisvasco: {
+                name: 'País Vasco',
+                level: 10,
+                description: 'Clima atlántico con productos de calidad.',
+                climate: 'Atlántico',
+                crops: ['manzana', 'pimiento', 'alubia', 'patata', 'guindilla'],
+                emoji: '🍏',
+                farmSize: 14
+            },
+            cantabria: {
+                name: 'Cantabria',
+                level: 11,
+                description: 'Verdes prados y productos cantábricos.',
+                climate: 'Atlántico',
+                crops: ['manzana', 'kiwi', 'alubia', 'patata', 'maiz'],
+                emoji: '🥝',
+                farmSize: 14
+            },
+            asturias: {
+                name: 'Asturias',
+                level: 12,
+                description: 'Paraíso natural de manzanas y sidra.',
+                climate: 'Atlántico húmedo',
+                crops: ['manzana', 'kiwi', 'faba', 'arandano', 'frambuesa'],
+                emoji: '🍎',
+                farmSize: 14
+            },
+            galicia: {
+                name: 'Galicia',
+                level: 13,
+                description: 'Tierra verde de patatas y productos del mar.',
+                climate: 'Atlántico',
+                crops: ['patata', 'pimiento', 'uva', 'kiwi', 'manzana', 'berza'],
+                emoji: '🥔',
+                farmSize: 16
+            },
+            madrid: {
+                name: 'Madrid',
+                level: 14,
+                description: 'Tradición de aceitunas, fresas y melones.',
+                climate: 'Continental',
+                crops: ['fresa', 'olivo', 'uva', 'melon', 'ajo', 'cebolla'],
+                emoji: '🍓',
+                farmSize: 12
+            },
+            andalucia: {
+                name: 'Andalucía',
+                level: 15,
+                description: 'La mayor diversidad agrícola de España.',
+                climate: 'Mediterráneo subtropical',
+                crops: ['olivo', 'naranja', 'fresa', 'aguacate', 'mango', 'tomate', 'pimiento', 'almendra', 'uva', 'algodon'],
+                emoji: '🥑',
+                farmSize: 24
+            },
+            baleares: {
+                name: 'Islas Baleares',
+                level: 16,
+                description: 'Almendros, olivos y productos mediterráneos.',
+                climate: 'Mediterráneo',
+                crops: ['almendra', 'olivo', 'naranja', 'albaricoque', 'higo', 'uva'],
+                emoji: '🏝️',
+                farmSize: 12
+            }
+        };
+
+        // Cultivos
+        const crops = {
+            trigo: { name: 'Trigo', emoji: '🌾', seasons: ['autumn', 'winter'], growTime: 8, price: 15, seedPrice: 5 },
+            cebada: { name: 'Cebada', emoji: '🌾', seasons: ['autumn', 'winter'], growTime: 7, price: 12, seedPrice: 4 },
+            maiz: { name: 'Maíz', emoji: '🌽', seasons: ['spring', 'summer'], growTime: 6, price: 18, seedPrice: 6 },
+            arroz: { name: 'Arroz', emoji: '🍚', seasons: ['spring', 'summer'], growTime: 7, price: 25, seedPrice: 10 },
+            tomate: { name: 'Tomate', emoji: '🍅', seasons: ['spring', 'summer'], growTime: 4, price: 20, seedPrice: 8 },
+            lechuga: { name: 'Lechuga', emoji: '🥬', seasons: ['spring', 'autumn'], growTime: 2, price: 10, seedPrice: 3 },
+            pimiento: { name: 'Pimiento', emoji: '🫑', seasons: ['spring', 'summer'], growTime: 5, price: 22, seedPrice: 9 },
+            brocoli: { name: 'Brócoli', emoji: '🥦', seasons: ['autumn', 'winter'], growTime: 4, price: 18, seedPrice: 7 },
+            alcachofa: { name: 'Alcachofa', emoji: '🌿', seasons: ['autumn', 'winter', 'spring'], growTime: 6, price: 35, seedPrice: 15 },
+            esparrago: { name: 'Espárrago', emoji: '🌿', seasons: ['spring'], growTime: 5, price: 40, seedPrice: 18 },
+            patata: { name: 'Patata', emoji: '🥔', seasons: ['spring', 'summer'], growTime: 5, price: 12, seedPrice: 4 },
+            cebolla: { name: 'Cebolla', emoji: '🧅', seasons: ['autumn', 'winter'], growTime: 6, price: 14, seedPrice: 5 },
+            ajo: { name: 'Ajo', emoji: '🧄', seasons: ['autumn'], growTime: 8, price: 25, seedPrice: 10 },
+            berza: { name: 'Berza', emoji: '🥬', seasons: ['autumn', 'winter'], growTime: 4, price: 8, seedPrice: 3 },
+            guindilla: { name: 'Guindilla', emoji: '🌶️', seasons: ['summer'], growTime: 4, price: 30, seedPrice: 12 },
+            naranja: { name: 'Naranja', emoji: '🍊', seasons: ['winter', 'spring'], growTime: 10, price: 30, seedPrice: 20 },
+            limon: { name: 'Limón', emoji: '🍋', seasons: ['winter', 'spring'], growTime: 10, price: 28, seedPrice: 18 },
+            manzana: { name: 'Manzana', emoji: '🍎', seasons: ['autumn'], growTime: 8, price: 22, seedPrice: 12 },
+            pera: { name: 'Pera', emoji: '🍐', seasons: ['summer', 'autumn'], growTime: 7, price: 24, seedPrice: 14 },
+            melocoton: { name: 'Melocotón', emoji: '🍑', seasons: ['summer'], growTime: 6, price: 26, seedPrice: 15 },
+            cereza: { name: 'Cereza', emoji: '🍒', seasons: ['spring'], growTime: 5, price: 45, seedPrice: 25 },
+            uva: { name: 'Uva', emoji: '🍇', seasons: ['summer', 'autumn'], growTime: 7, price: 35, seedPrice: 20 },
+            fresa: { name: 'Fresa', emoji: '🍓', seasons: ['spring'], growTime: 3, price: 40, seedPrice: 18 },
+            melon: { name: 'Melón', emoji: '🍈', seasons: ['summer'], growTime: 5, price: 20, seedPrice: 10 },
+            sandia: { name: 'Sandía', emoji: '🍉', seasons: ['summer'], growTime: 5, price: 18, seedPrice: 8 },
+            higo: { name: 'Higo', emoji: '🫐', seasons: ['summer', 'autumn'], growTime: 6, price: 30, seedPrice: 16 },
+            albaricoque: { name: 'Albaricoque', emoji: '🍑', seasons: ['spring', 'summer'], growTime: 5, price: 28, seedPrice: 15 },
+            kaki: { name: 'Kaki', emoji: '🍊', seasons: ['autumn'], growTime: 8, price: 32, seedPrice: 18 },
+            kiwi: { name: 'Kiwi', emoji: '🥝', seasons: ['autumn', 'winter'], growTime: 9, price: 38, seedPrice: 22 },
+            arandano: { name: 'Arándano', emoji: '🫐', seasons: ['summer'], growTime: 5, price: 50, seedPrice: 30 },
+            frambuesa: { name: 'Frambuesa', emoji: '🍇', seasons: ['summer'], growTime: 4, price: 48, seedPrice: 28 },
+            aguacate: { name: 'Aguacate', emoji: '🥑', seasons: ['winter', 'spring'], growTime: 12, price: 60, seedPrice: 40 },
+            mango: { name: 'Mango', emoji: '🥭', seasons: ['summer', 'autumn'], growTime: 14, price: 70, seedPrice: 50 },
+            lentejas: { name: 'Lentejas', emoji: '🫘', seasons: ['autumn', 'winter'], growTime: 6, price: 25, seedPrice: 10 },
+            garbanzos: { name: 'Garbanzos', emoji: '🫘', seasons: ['spring'], growTime: 7, price: 28, seedPrice: 12 },
+            alubia: { name: 'Alubia', emoji: '🫘', seasons: ['spring', 'summer'], growTime: 5, price: 30, seedPrice: 14 },
+            faba: { name: 'Faba', emoji: '🫘', seasons: ['spring'], growTime: 6, price: 45, seedPrice: 25 },
+            almendra: { name: 'Almendra', emoji: '🌰', seasons: ['summer', 'autumn'], growTime: 10, price: 50, seedPrice: 30 },
+            avellana: { name: 'Avellana', emoji: '🌰', seasons: ['autumn'], growTime: 9, price: 45, seedPrice: 28 },
+            azafran: { name: 'Azafrán', emoji: '🌸', seasons: ['autumn'], growTime: 8, price: 200, seedPrice: 80 },
+            olivo: { name: 'Aceitunas', emoji: '🫒', seasons: ['autumn', 'winter'], growTime: 12, price: 40, seedPrice: 25 },
+            girasol: { name: 'Girasol', emoji: '🌻', seasons: ['summer'], growTime: 5, price: 22, seedPrice: 8 },
+            champiñon: { name: 'Champiñón', emoji: '🍄', seasons: ['spring', 'autumn', 'winter'], growTime: 2, price: 20, seedPrice: 10 },
+            chufa: { name: 'Chufa', emoji: '🌰', seasons: ['spring', 'summer'], growTime: 6, price: 35, seedPrice: 18 },
+            bellota: { name: 'Bellota', emoji: '🌰', seasons: ['autumn'], growTime: 15, price: 80, seedPrice: 45 },
+            algodon: { name: 'Algodón', emoji: '☁️', seasons: ['summer'], growTime: 8, price: 45, seedPrice: 25 },
+            remolacha: { name: 'Remolacha', emoji: '🫐', seasons: ['spring', 'summer'], growTime: 5, price: 15, seedPrice: 6 }
+        };
+
+        // Herramientas
+        const tools = {
+            azada: { name: 'Azada Básica', emoji: '⛏️', price: 0, effect: 'Permite cultivar' },
+            regadera: { name: 'Regadera Mejorada', emoji: '🚿', price: 100, effect: '-50% energía al regar' },
+            tractor: { name: 'Tractor', emoji: '🚜', price: 2000, effect: '-20% tiempo de crecimiento' },
+            invernadero: { name: 'Invernadero', emoji: '🏠', price: 5000, effect: 'Ignora temporadas' },
+            sistemaRiego: { name: 'Sistema de Riego', emoji: '💧', price: 3000, effect: 'Riego automático' }
+        };
+
+        // Equipos de electrocultura
+        const electroEquipment = {
+            copperAntenna: { name: 'Antena de Cobre', emoji: '📡', price: 800, effect: '+15% velocidad', description: 'Captura electricidad atmosférica.' },
+            magneticPoles: { name: 'Polos Magnéticos', emoji: '🧲', price: 1500, effect: '+20% cosecha', description: 'Mejora absorción de nutrientes.' },
+            pyramidStructure: { name: 'Pirámide Energética', emoji: '🔺', price: 3000, effect: '+25% precio venta', description: 'Concentra energía cósmica.' },
+            electroStimulator: { name: 'Electroestimulador', emoji: '⚡', price: 5000, effect: '-2 días crecimiento', description: 'Pulsos eléctricos a las raíces.' },
+            cosmicAntenna: { name: 'Antena Cósmica', emoji: '🛸', price: 10000, effect: 'Todos los bonuses', description: 'Tecnología definitiva.' }
+        };
+
+        // Variables de minijuego
+        let minigameInterval = null;
+        let minigameTimeout = null;
+        let minigameScore = 0;
+        let minigameType = null;
+
+        // ============ INICIALIZACIÓN ============
+        function startGame() {
+            document.getElementById('startScreen').classList.add('hidden');
+            document.getElementById('gameContainer').classList.remove('hidden');
+            initGame();
+        }
+
+        function initGame() {
+            // Inicializar granja de la región inicial
+            initFarmForRegion('castillalamancha');
+            
+            // Semillas iniciales (cultivos de otoño para Castilla-La Mancha)
+            gameData.inventory.seeds = {
+                trigo: 5,
+                cebada: 5,
+                azafran: 2,
+                uva: 3
+            };
+            
+            updateUI();
+            renderFarm();
+            renderShop();
+            renderElectroculture();
+        }
+
+        function initFarmForRegion(regionId) {
+            if (!gameData.farms[regionId]) {
+                const region = regions[regionId];
+                const plots = [];
+                for (let i = 0; i < region.farmSize; i++) {
+                    plots.push({
+                        planted: null,
+                        daysGrown: 0,
+                        watered: false,
+                        ready: false
+                    });
+                }
+                gameData.farms[regionId] = { plots: plots };
+            }
+        }
+
+        // ============ NAVEGACIÓN ============
+        function showView(view) {
+            const views = ['mapView', 'farmView', 'minigameView', 'shopView', 'electrocultureView'];
+            views.forEach(v => {
+                const el = document.getElementById(v);
+                if (el) el.classList.add('hidden');
+            });
+            
+            document.getElementById(view + 'View').classList.remove('hidden');
+            
+            // Actualizar navegación activa
+            document.querySelectorAll('.nav-btn').forEach(btn => {
+                btn.classList.remove('ring-2', 'ring-yellow-400');
+            });
+            const activeBtn = document.getElementById('nav' + view.charAt(0).toUpperCase() + view.slice(1));
+            if (activeBtn) activeBtn.classList.add('ring-2', 'ring-yellow-400');
+            
+            if (view === 'farm') {
+                updateFarmBackground();
+                renderFarm();
+                renderSeeds();
+                renderQuickInventory();
+            } else if (view === 'shop') {
+                renderShop();
+            } else if (view === 'electroculture') {
+                renderElectroculture();
+            }
+        }
+
+        function updateFarmBackground() {
+            const farm = document.getElementById('farmFullscreen');
+            farm.classList.remove('season-spring-bg', 'season-summer-bg', 'season-autumn-bg', 'season-winter-bg');
+            farm.classList.add(`season-${gameData.season}-bg`);
+        }
+
+        // ============ UI ============
+        function updateUI() {
+            document.getElementById('money').textContent = gameData.money;
+            document.getElementById('energy').textContent = gameData.energy;
+            document.getElementById('level').textContent = gameData.level;
+            document.getElementById('xp').textContent = gameData.xp;
+            document.getElementById('xpNeeded').textContent = gameData.xpNeeded;
+            
+            if (document.getElementById('currentDay')) {
+                document.getElementById('currentDay').textContent = gameData.day;
+                document.getElementById('currentYear').textContent = gameData.year;
+            }
+            
+            const seasonEmojis = { spring: '🌸', summer: '☀️', autumn: '🍂', winter: '❄️' };
+            const seasonNames = { spring: 'Primavera', summer: 'Verano', autumn: 'Otoño', winter: 'Invierno' };
+            
+            const seasonIndicator = document.getElementById('seasonIndicator');
+            seasonIndicator.textContent = `${seasonEmojis[gameData.season]} ${seasonNames[gameData.season]}`;
+            seasonIndicator.className = `px-3 py-1 rounded-full text-white font-bold text-sm season-${gameData.season}`;
+            
+            if (document.getElementById('currentSeasonText')) {
+                document.getElementById('currentSeasonText').textContent = `${seasonEmojis[gameData.season]} ${seasonNames[gameData.season]}`;
+            }
+            
+            // Barra de XP
+            const xpPercent = (gameData.xp / gameData.xpNeeded) * 100;
+            if (document.getElementById('xpBar')) {
+                document.getElementById('xpBar').style.width = `${xpPercent}%`;
+            }
+            if (document.getElementById('levelProgress')) {
+                document.getElementById('levelProgress').textContent = gameData.level;
+                document.getElementById('xpProgress').textContent = gameData.xp;
+                document.getElementById('xpNeededProgress').textContent = gameData.xpNeeded;
+            }
+            
+            // Regiones desbloqueadas
+            document.getElementById('unlockedCount').textContent = `${gameData.unlockedRegions.length} / ${Object.keys(regions).length}`;
+            
+            // Actualizar mapa
+            Object.keys(regions).forEach(regionId => {
+                const el = document.getElementById('region-' + regionId);
+                if (el) {
+                    el.classList.remove('locked', 'current');
+                    if (!gameData.unlockedRegions.includes(regionId)) {
+                        el.classList.add('locked');
+                    }
+                    if (regionId === gameData.currentRegion) {
+                        el.classList.add('current');
+                    }
+                }
+            });
+            
+            // Electrocultura
+            const hasElectro = Object.values(gameData.electroculture).some(v => v);
+            const electroStatus = document.getElementById('electrocultureStatus');
+            if (electroStatus) {
+                if (hasElectro) {
+                    electroStatus.className = 'bg-green-700 px-3 py-1 rounded-lg text-sm electroculture-active';
+                    electroStatus.innerHTML = '<span class="text-green-200">⚡ Electrocultura: Activa</span>';
+                }
+            }
+            
+            // Título de granja
+            if (document.getElementById('farmRegionTitle')) {
+                document.getElementById('farmRegionTitle').textContent = `🌾 Granja de ${regions[gameData.currentRegion].name}`;
+            }
+            if (document.getElementById('shopRegionName')) {
+                document.getElementById('shopRegionName').textContent = regions[gameData.currentRegion].name;
+            }
+        }
+
+        // ============ GRANJA ============
+        function renderFarm() {
+            const grid = document.getElementById('farmGrid');
+            if (!grid) return;
+            grid.innerHTML = '';
+            
+            const farm = gameData.farms[gameData.currentRegion];
+            if (!farm) return;
+            
+            farm.plots.forEach((plot, index) => {
+                const cell = document.createElement('div');
+                cell.className = 'crop-cell w-14 h-14 sm:w-16 sm:h-16 md:w-20 md:h-20 rounded-xl flex items-center justify-center cursor-pointer relative';
+                
+                if (plot.planted) {
+                    const crop = crops[plot.planted];
+                    const progress = Math.min(plot.daysGrown / getGrowTime(plot.planted), 1);
+                    
+                    if (plot.ready) {
+                        cell.classList.add('ready-harvest');
+                        cell.innerHTML = `
+                            <span class="text-2xl md:text-3xl">${crop.emoji}</span>
+                            <span class="absolute -bottom-1 -right-1 text-xs bg-green-500 text-white px-1 rounded-full">✓</span>
+                        `;
+                        cell.title = `${crop.name} - ¡Listo para cosechar!`;
+                    } else {
+                        const stage = progress < 0.33 ? '🌱' : progress < 0.66 ? '🌿' : crop.emoji;
+                        cell.innerHTML = `
+                            <span class="text-xl md:text-2xl">${stage}</span>
+                            <div class="absolute bottom-1 left-1 right-1 h-1.5 bg-gray-700 rounded-full overflow-hidden">
+                                <div class="h-full bg-green-500 transition-all" style="width: ${progress * 100}%"></div>
+                            </div>
+                        `;
+                        cell.title = `${crop.name} - ${Math.floor(progress * 100)}%`;
+                    }
+                    
+                    if (plot.watered) {
+                        cell.innerHTML += '<span class="absolute top-0 right-0 text-xs">💧</span>';
+                    }
+                    
+                    cell.onclick = () => interactPlot(index);
+                } else {
+                    cell.innerHTML = '<span class="text-gray-500 text-2xl md:text-3xl font-bold">+</span>';
+                    cell.title = 'Parcela vacía - Clic para plantar';
+                    cell.onclick = () => openPlantModal(index);
+                }
+                
+                grid.appendChild(cell);
+            });
+        }
+
+        function renderSeeds() {
+            const list = document.getElementById('seedList');
+            if (!list) return;
+            list.innerHTML = '';
+            
+            const regionCrops = regions[gameData.currentRegion].crops;
+            let hasSeedsForRegion = false;
+            
+            Object.entries(gameData.inventory.seeds).forEach(([seedId, qty]) => {
+                if (qty > 0 && regionCrops.includes(seedId)) {
+                    hasSeedsForRegion = true;
+                    const crop = crops[seedId];
+                    const inSeason = crop.seasons.includes(gameData.season) || gameData.inventory.tools.invernadero;
+                    
+                    const item = document.createElement('div');
+                    item.className = `p-2 rounded-lg ${inSeason ? 'bg-green-800/80' : 'bg-gray-700/80'} flex items-center gap-2`;
+                    item.innerHTML = `
+                        <span class="text-lg">${crop.emoji}</span>
+                        <div class="flex-1 min-w-0">
+                            <p class="text-white text-xs font-bold truncate">${crop.name}</p>
+                            <p class="text-xs ${inSeason ? 'text-green-300' : 'text-red-300'}">${inSeason ? '✓ Temporada' : '✗ Fuera'}</p>
+                        </div>
+                        <span class="text-yellow-300 font-bold text-sm">${qty}</span>
+                    `;
+                    list.appendChild(item);
+                }
+            });
+            
+            if (!hasSeedsForRegion) {
+                list.innerHTML = '<p class="text-gray-400 text-xs text-center py-2">Sin semillas para esta región</p>';
+            }
+        }
+
+        function renderQuickInventory() {
+            const container = document.getElementById('quickInventory');
+            if (!container) return;
+            container.innerHTML = '';
+            
+            const harvests = Object.entries(gameData.inventory.harvests).filter(([_, q]) => q > 0);
+            if (harvests.length === 0) {
+                container.innerHTML = '<p class="text-gray-400 text-xs">Sin cosechas</p>';
+                return;
+            }
+            
+            harvests.slice(0, 5).forEach(([cropId, qty]) => {
+                const crop = crops[cropId];
+                const item = document.createElement('div');
+                item.className = 'flex items-center gap-1 text-white';
+                item.innerHTML = `<span>${crop.emoji}</span><span class="truncate flex-1">${crop.name}</span><span class="text-yellow-300">x${Math.floor(qty)}</span>`;
+                container.appendChild(item);
+            });
+        }
+
+        function openPlantModal(index) {
+            gameData.selectedPlotIndex = index;
+            const modal = document.getElementById('plantModal');
+            const container = document.getElementById('plantModalSeeds');
+            container.innerHTML = '';
+            
+            const regionCrops = regions[gameData.currentRegion].crops;
+            let hasSeeds = false;
+            
+            Object.entries(gameData.inventory.seeds).forEach(([seedId, qty]) => {
+                if (qty > 0 && regionCrops.includes(seedId)) {
+                    hasSeeds = true;
+                    const crop = crops[seedId];
+                    const inSeason = crop.seasons.includes(gameData.season) || gameData.inventory.tools.invernadero;
+                    
+                    const btn = document.createElement('button');
+                    btn.className = `w-full p-3 rounded-lg ${inSeason ? 'bg-green-700 hover:bg-green-600' : 'bg-gray-700 opacity-50 cursor-not-allowed'} flex items-center gap-3 transition-all`;
+                    btn.disabled = !inSeason;
+                    btn.innerHTML = `
+                        <span class="text-2xl">${crop.emoji}</span>
+                        <div class="flex-1 text-left">
+                            <p class="text-white font-bold">${crop.name}</p>
+                            <p class="text-gray-300 text-xs">${getGrowTime(seedId)} días | Venta: ${Math.floor(crop.price * getPriceMultiplier())}💰</p>
+                        </div>
+                        <span class="text-yellow-300 font-bold">${qty}</span>
+                    `;
+                    btn.onclick = () => plantSeed(seedId);
+                    container.appendChild(btn);
+                }
+            });
+            
+            if (!hasSeeds) {
+                container.innerHTML = '<p class="text-gray-400 text-center py-4">No tienes semillas para esta región. ¡Visita la tienda!</p>';
+            }
+            
+            modal.classList.remove('hidden');
+        }
+
+        function closePlantModal() {
+            document.getElementById('plantModal').classList.add('hidden');
+            gameData.selectedPlotIndex = null;
+        }
+
+        function plantSeed(seedId) {
+            if (gameData.energy < 5) {
+                alert('¡No tienes suficiente energía! Juega minijuegos o pasa el día.');
+                return;
+            }
+            
+            const farm = gameData.farms[gameData.currentRegion];
+            const index = gameData.selectedPlotIndex;
+            
+            farm.plots[index] = {
+                planted: seedId,
+                daysGrown: 0,
+                watered: false,
+                ready: false
+            };
+            
+            gameData.inventory.seeds[seedId]--;
+            if (gameData.inventory.seeds[seedId] <= 0) delete gameData.inventory.seeds[seedId];
+            
+            gameData.energy -= 5;
+            closePlantModal();
+            renderFarm();
+            renderSeeds();
+            updateUI();
+        }
+
+        function interactPlot(index) {
+            const farm = gameData.farms[gameData.currentRegion];
+            const plot = farm.plots[index];
+            if (!plot.planted) return;
+            
+            if (plot.ready) {
+                harvestPlot(index);
+            } else if (!plot.watered && gameData.energy >= 2) {
+                waterPlot(index);
+            }
+        }
+
+        function waterPlot(index) {
+            const cost = gameData.inventory.tools.regadera ? 1 : 2;
+            if (gameData.energy < cost) return;
+            
+            gameData.farms[gameData.currentRegion].plots[index].watered = true;
+            gameData.energy -= cost;
+            renderFarm();
+            updateUI();
+        }
+
+        function waterAll() {
+            const cost = gameData.inventory.tools.regadera ? 5 : 10;
+            if (gameData.energy < cost) {
+                alert('¡No tienes suficiente energía!');
+                return;
+            }
+            
+            gameData.farms[gameData.currentRegion].plots.forEach(plot => {
+                if (plot.planted && !plot.ready) plot.watered = true;
+            });
+            
+            gameData.energy -= cost;
+            renderFarm();
+            updateUI();
+        }
+
+        function harvestPlot(index) {
+            const farm = gameData.farms[gameData.currentRegion];
+            const plot = farm.plots[index];
+            if (!plot.ready) return;
+            
+            const cropId = plot.planted;
+            const crop = crops[cropId];
+            const amount = getHarvestAmount();
+            
+            if (!gameData.inventory.harvests[cropId]) gameData.inventory.harvests[cropId] = 0;
+            gameData.inventory.harvests[cropId] += amount;
+            
+            gainXP(Math.floor(crop.price / 3));
+            
+            farm.plots[index] = { planted: null, daysGrown: 0, watered: false, ready: false };
+            
+            renderFarm();
+            renderQuickInventory();
+            updateUI();
+        }
+
+        function harvestAll() {
+            const farm = gameData.farms[gameData.currentRegion];
+            farm.plots.forEach((plot, i) => {
+                if (plot.ready) harvestPlot(i);
+            });
+        }
+
+        function expandFarm() {
+            if (gameData.money < 500) {
+                alert('¡No tienes suficiente dinero! Necesitas 500💰');
+                return;
+            }
+            
+            gameData.money -= 500;
+            const farm = gameData.farms[gameData.currentRegion];
+            for (let i = 0; i < 4; i++) {
+                farm.plots.push({ planted: null, daysGrown: 0, watered: false, ready: false });
+            }
+            
+            renderFarm();
+            updateUI();
+        }
+
+        function advanceDay() {
+            gameData.day++;
+            
+            // Crecer todos los cultivos en todas las regiones
+            Object.values(gameData.farms).forEach(farm => {
+                farm.plots.forEach(plot => {
+                    if (plot.planted && !plot.ready) {
+                        plot.daysGrown += plot.watered ? 1.5 : 1;
+                        plot.watered = false;
+                        
+                        if (plot.daysGrown >= getGrowTime(plot.planted)) {
+                            plot.ready = true;
+                        }
+                    }
+                });
+                
+                // Riego automático
+                if (gameData.inventory.tools.sistemaRiego) {
+                    farm.plots.forEach(plot => {
+                        if (plot.planted && !plot.ready) plot.watered = true;
+                    });
+                }
+            });
+            
+            // Cambio de estación
+            if (gameData.day % 30 === 0) {
+                const seasons = ['spring', 'summer', 'autumn', 'winter'];
+                const idx = seasons.indexOf(gameData.season);
+                gameData.season = seasons[(idx + 1) % 4];
+                if (gameData.season === 'spring') gameData.year++;
+            }
+            
+            // Recuperar energía
+            gameData.energy = Math.min(gameData.maxEnergy, gameData.energy + 40);
+            
+            updateFarmBackground();
+            renderFarm();
+            updateUI();
+        }
+
+        // ============ CÁLCULOS ============
+        function getGrowTime(cropId) {
+            let time = crops[cropId].growTime;
+            if (gameData.electroculture.electroStimulator) time -= 2;
+            if (gameData.electroculture.copperAntenna) time *= 0.85;
+            if (gameData.electroculture.cosmicAntenna) time *= 0.7;
+            if (gameData.inventory.tools.tractor) time *= 0.8;
+            return Math.max(1, Math.floor(time));
+        }
+
+        function getHarvestAmount() {
+            let amount = 1;
+            if (gameData.electroculture.magneticPoles) amount += 0.2;
+            if (gameData.electroculture.cosmicAntenna) amount += 0.3;
+            return amount;
+        }
+
+        function getPriceMultiplier() {
+            let mult = 1;
+            if (gameData.electroculture.pyramidStructure) mult += 0.25;
+            if (gameData.electroculture.cosmicAntenna) mult += 0.25;
+            return mult;
+        }
+
+        function gainXP(amount) {
+            gameData.xp += amount;
+            while (gameData.xp >= gameData.xpNeeded) {
+                gameData.xp -= gameData.xpNeeded;
+                gameData.level++;
+                gameData.xpNeeded = Math.floor(gameData.xpNeeded * 1.4);
+                
+                // Desbloquear región
+                const regionOrder = Object.keys(regions);
+                if (gameData.level <= regionOrder.length) {
+                    const newRegion = regionOrder[gameData.level - 1];
+                    if (!gameData.unlockedRegions.includes(newRegion)) {
+                        gameData.unlockedRegions.push(newRegion);
+                        initFarmForRegion(newRegion);
+                        alert(`🎉 ¡Has desbloqueado ${regions[newRegion].name}!`);
+                    }
+                }
+            }
+            updateUI();
+        }
+
+        // ============ REGIONES ============
+        function selectRegion(regionId) {
+            const region = regions[regionId];
+            const unlocked = gameData.unlockedRegions.includes(regionId);
+            
+            const modal = document.getElementById('regionModal');
+            const content = document.getElementById('regionModalContent');
+            
+            content.innerHTML = `
+                <div class="text-center mb-4">
+                    <span class="text-5xl">${region.emoji}</span>
+                    <h2 class="title-font text-2xl text-yellow-300 mt-2">${region.name}</h2>
+                    <p class="text-green-200 text-sm">${region.description}</p>
+                </div>
+                <div class="bg-black/30 rounded-xl p-3 mb-4 text-sm">
+                    <p class="text-amber-300">🌡️ Clima: ${region.climate}</p>
+                    <p class="text-amber-300">⭐ Nivel requerido: ${region.level}</p>
+                    <p class="text-amber-300">📦 Parcelas: ${region.farmSize}</p>
+                    <p class="text-amber-300">${unlocked ? '🔓 Desbloqueada' : '🔒 Bloqueada'}</p>
+                </div>
+                <div class="mb-4">
+                    <p class="text-yellow-300 font-bold text-sm mb-2">🌱 Cultivos:</p>
+                    <div class="flex flex-wrap gap-1">
+                        ${region.crops.map(c => crops[c] ? `<span class="bg-green-800/60 px-2 py-0.5 rounded text-white text-xs">${crops[c].emoji} ${crops[c].name}</span>` : '').join('')}
+                    </div>
+                </div>
+                ${unlocked ? `
+                    <button onclick="travelToRegion('${regionId}')" class="w-full bg-green-600 hover:bg-green-500 text-white py-3 rounded-xl font-bold">
+                        🚜 Ir a ${region.name}
+                    </button>
+                ` : `
+                    <div class="bg-red-900/50 p-3 rounded-xl text-center">
+                        <p class="text-red-300 text-sm">Necesitas nivel ${region.level}</p>
+                        <p class="text-gray-400 text-xs">Tu nivel: ${gameData.level}</p>
+                    </div>
+                `}
+            `;
+            
+            modal.classList.remove('hidden');
+        }
+
+        function closeRegionModal() {
+            document.getElementById('regionModal').classList.add('hidden');
+        }
+
+        function travelToRegion(regionId) {
+            gameData.currentRegion = regionId;
+            initFarmForRegion(regionId);
+            closeRegionModal();
+            showView('farm');
+            updateUI();
+        }
+
+        // ============ TIENDA ============
+        function renderShop() {
+            renderShopSeeds();
+            renderShopTools();
+            renderShopElectro();
+            renderSellSection();
+        }
+
+        function renderShopSeeds() {
+            const container = document.getElementById('shopSeeds');
+            if (!container) return;
+            container.innerHTML = '';
+            
+            regions[gameData.currentRegion].crops.forEach(cropId => {
+                const crop = crops[cropId];
+                if (!crop) return;
+                
+                const inSeason = crop.seasons.includes(gameData.season);
+                const item = document.createElement('div');
+                item.className = 'bg-green-800/50 p-2 rounded-lg flex items-center gap-2';
+                item.innerHTML = `
+                    <span class="text-xl">${crop.emoji}</span>
+                    <div class="flex-1 min-w-0">
+                        <p class="text-white text-sm font-bold truncate">${crop.name}</p>
+                        <p class="text-xs ${inSeason ? 'text-green-300' : 'text-gray-400'}">${inSeason ? '✓ En temporada' : 'Fuera de temp.'}</p>
+                    </div>
+                    <button onclick="buySeed('${cropId}')" class="bg-yellow-600 hover:bg-yellow-500 text-white px-2 py-1 rounded text-sm font-bold">
+                        ${crop.seedPrice}💰
+                    </button>
+                `;
+                container.appendChild(item);
+            });
+        }
+
+        function renderShopTools() {
+            const container = document.getElementById('shopTools');
+            if (!container) return;
+            container.innerHTML = '';
+            
+            Object.entries(tools).forEach(([id, tool]) => {
+                if (id === 'azada') return;
+                const owned = gameData.inventory.tools[id];
+                
+                const item = document.createElement('div');
+                item.className = `p-2 rounded-lg ${owned ? 'bg-gray-700' : 'bg-blue-800/50'}`;
+                item.innerHTML = `
+                    <div class="flex items-center gap-2">
+                        <span class="text-xl">${tool.emoji}</span>
+                        <div class="flex-1">
+                            <p class="text-white text-sm font-bold">${tool.name}</p>
+                            <p class="text-blue-300 text-xs">${tool.effect}</p>
+                        </div>
+                        ${owned ? '<span class="text-green-400 text-sm">✓</span>' : `<button onclick="buyTool('${id}')" class="bg-yellow-600 hover:bg-yellow-500 text-white px-2 py-1 rounded text-sm font-bold">${tool.price}💰</button>`}
+                    </div>
+                `;
+                container.appendChild(item);
+            });
+        }
+
+        function renderShopElectro() {
+            const container = document.getElementById('shopElectro');
+            if (!container) return;
+            container.innerHTML = '';
+            
+            Object.entries(electroEquipment).forEach(([id, eq]) => {
+                const owned = gameData.electroculture[id];
+                
+                const item = document.createElement('div');
+                item.className = `p-2 rounded-lg ${owned ? 'bg-gray-700' : 'bg-purple-800/50'}`;
+                item.innerHTML = `
+                    <div class="flex items-center gap-2 mb-1">
+                        <span class="text-xl">${eq.emoji}</span>
+                        <div class="flex-1">
+                            <p class="text-white text-sm font-bold">${eq.name}</p>
+                            <p class="text-yellow-300 text-xs">${eq.effect}</p>
+                        </div>
+                    </div>
+                    ${owned ? '<span class="text-green-400 text-sm">✓ Instalado</span>' : `<button onclick="buyElectro('${id}')" class="w-full bg-yellow-600 hover:bg-yellow-500 text-white py-1 rounded text-sm font-bold">${eq.price}💰</button>`}
+                `;
+                container.appendChild(item);
+            });
+        }
+
+        function renderSellSection() {
+            const container = document.getElementById('sellSection');
+            if (!container) return;
+            container.innerHTML = '';
+            
+            const harvests = Object.entries(gameData.inventory.harvests).filter(([_, q]) => q > 0);
+            if (harvests.length === 0) {
+                container.innerHTML = '<p class="text-gray-400 col-span-full text-center py-4">No tienes cosechas para vender</p>';
+                return;
+            }
+            
+            harvests.forEach(([cropId, qty]) => {
+                const crop = crops[cropId];
+                const price = Math.floor(crop.price * getPriceMultiplier());
+                
+                const item = document.createElement('div');
+                item.className = 'bg-amber-800/50 p-3 rounded-lg text-center';
+                item.innerHTML = `
+                    <span class="text-2xl">${crop.emoji}</span>
+                    <p class="text-white text-sm font-bold">${crop.name}</p>
+                    <p class="text-yellow-300 text-sm">x${Math.floor(qty)}</p>
+                    <button onclick="sellHarvest('${cropId}')" class="mt-1 w-full bg-green-600 hover:bg-green-500 text-white px-2 py-1 rounded text-xs font-bold">
+                        Vender ${price}💰
+                    </button>
+                `;
+                container.appendChild(item);
+            });
+        }
+
+        function buySeed(cropId) {
+            const crop = crops[cropId];
+            if (gameData.money < crop.seedPrice) {
+                alert('¡No tienes suficiente dinero!');
+                return;
+            }
+            gameData.money -= crop.seedPrice;
+            gameData.inventory.seeds[cropId] = (gameData.inventory.seeds[cropId] || 0) + 1;
+            updateUI();
+            renderSeeds();
+        }
+
+        function buyTool(toolId) {
+            const tool = tools[toolId];
+            if (gameData.money < tool.price) {
+                alert('¡No tienes suficiente dinero!');
+                return;
+            }
+            gameData.money -= tool.price;
+            gameData.inventory.tools[toolId] = true;
+            updateUI();
+            renderShopTools();
+        }
+
+        function buyElectro(eqId) {
+            const eq = electroEquipment[eqId];
+            if (gameData.money < eq.price) {
+                alert('¡No tienes suficiente dinero!');
+                return;
+            }
+            gameData.money -= eq.price;
+            gameData.electroculture[eqId] = true;
+            updateUI();
+            renderShopElectro();
+            renderElectroculture();
+        }
+
+        function sellHarvest(cropId) {
+            const qty = gameData.inventory.harvests[cropId];
+            if (!qty || qty <= 0) return;
+            
+            const price = Math.floor(crops[cropId].price * getPriceMultiplier() * qty);
+            gameData.money += price;
+            delete gameData.inventory.harvests[cropId];
+            
+            updateUI();
+            renderSellSection();
+            renderQuickInventory();
+        }
+
+        // ============ ELECTROCULTURA ============
+        function renderElectroculture() {
+            const techContainer = document.getElementById('electroTechniques');
+            const benefitsContainer = document.getElementById('activeBenefits');
+            if (!techContainer || !benefitsContainer) return;
+            
+            techContainer.innerHTML = '';
+            Object.entries(electroEquipment).forEach(([id, eq]) => {
+                const owned = gameData.electroculture[id];
+                const item = document.createElement('div');
+                item.className = `p-3 rounded-xl ${owned ? 'bg-green-800/50 electroculture-active' : 'bg-gray-800/50'}`;
+                item.innerHTML = `
+                    <div class="flex items-center gap-3">
+                        <span class="text-2xl">${eq.emoji}</span>
+                        <div class="flex-1">
+                            <p class="text-white font-bold">${eq.name}</p>
+                            <p class="text-yellow-300 text-sm">${eq.effect}</p>
+                            <p class="text-gray-400 text-xs">${eq.description}</p>
+                        </div>
+                        ${owned ? '<span class="text-green-400 text-xl">✓</span>' : `<button onclick="buyElectro('${id}')" class="bg-yellow-600 hover:bg-yellow-500 text-white px-3 py-1 rounded font-bold text-sm">${eq.price}💰</button>`}
+                    </div>
+                `;
+                techContainer.appendChild(item);
+            });
+            
+            benefitsContainer.innerHTML = '';
+            const benefits = [];
+            if (gameData.electroculture.copperAntenna) benefits.push({ emoji: '📡', text: '+15% velocidad' });
+            if (gameData.electroculture.magneticPoles) benefits.push({ emoji: '🧲', text: '+20% cosecha' });
+            if (gameData.electroculture.pyramidStructure) benefits.push({ emoji: '🔺', text: '+25% precio' });
+            if (gameData.electroculture.electroStimulator) benefits.push({ emoji: '⚡', text: '-2 días' });
+            if (gameData.electroculture.cosmicAntenna) benefits.push({ emoji: '🛸', text: 'Todos x2' });
+            
+            if (benefits.length === 0) {
+                benefitsContainer.innerHTML = '<p class="text-gray-400 text-sm">Compra equipos para activar beneficios.</p>';
+            } else {
+                benefits.forEach(b => {
+                    const item = document.createElement('div');
+                    item.className = 'bg-green-700/50 p-2 rounded-lg flex items-center gap-2';
+                    item.innerHTML = `<span class="text-xl">${b.emoji}</span><span class="text-green-200 text-sm">${b.text}</span>`;
+                    benefitsContainer.appendChild(item);
+                });
+            }
+        }
+
+        // ============ MINIJUEGOS ============
+        function startMinigame(type) {
+            const costs = { catch: 10, pest: 5, water: 0, electric: 15 };
+            if (gameData.energy < costs[type]) {
+                alert('¡No tienes suficiente energía!');
+                return;
+            }
+            gameData.energy -= costs[type];
+            updateUI();
+            
+            minigameType = type;
+            minigameScore = 0;
+            document.getElementById('minigameScore').textContent = '0';
+            document.getElementById('minigameTimer').textContent = '30';
+            
+            const titles = {
+                catch: '🧺 Atrapa la Cosecha',
+                pest: '🐛 Elimina Plagas',
+                water: '💧 Riego Rápido',
+                electric: '⚡ Carga Eléctrica'
+            };
+            document.getElementById('minigameTitle').textContent = titles[type];
+            
+            document.getElementById('minigameModal').classList.remove('hidden');
+            
+            const area = document.getElementById('minigameArea');
+            area.innerHTML = '';
+            
+            if (type === 'catch') startCatchGame(area);
+            else if (type === 'pest') startPestGame(area);
+            else if (type === 'water') startWaterGame(area);
+            else if (type === 'electric') startElectricGame(area);
+            
+            let time = 30;
+            minigameInterval = setInterval(() => {
+                time--;
+                document.getElementById('minigameTimer').textContent = time;
+                if (time <= 0) endMinigame();
+            }, 1000);
+        }
+
+        function startCatchGame(area) {
+            const fruits = ['🍎', '🍊', '🍋', '🍇', '🍓', '🍑', '🌽', '🥕'];
+            const bad = ['🪨', '💀'];
+            
+            function spawnItem() {
+                const item = document.createElement('div');
+                item.className = 'falling-item';
+                const isBad = Math.random() < 0.2;
+                item.textContent = isBad ? bad[Math.floor(Math.random() * bad.length)] : fruits[Math.floor(Math.random() * fruits.length)];
+                item.dataset.bad = isBad;
+                item.style.left = Math.random() * 80 + 10 + '%';
+                item.style.top = '0';
+                
+                item.onclick = () => {
+                    if (item.dataset.bad === 'true') {
+                        minigameScore = Math.max(0, minigameScore - 3);
+                    } else {
+                        minigameScore += 5;
+                        item.classList.add('caught');
+                    }
+                    document.getElementById('minigameScore').textContent = minigameScore;
+                    setTimeout(() => item.remove(), 300);
+                };
+                
+                area.appendChild(item);
+                
+                let pos = 0;
+                const fall = setInterval(() => {
+                    pos += 3;
+                    item.style.top = pos + 'px';
+                    if (pos > 380) {
+                        clearInterval(fall);
+                        item.remove();
+                    }
+                }, 50);
+            }
+            
+            minigameTimeout = setInterval(spawnItem, 600);
+        }
+
+        function startPestGame(area) {
+            const pests = ['🐛', '🐜', '🦗', '🐌', '🪲'];
+            
+            function spawnPest() {
+                const pest = document.createElement('div');
+                pest.className = 'falling-item';
+                pest.textContent = pests[Math.floor(Math.random() * pests.length)];
+                pest.style.left = Math.random() * 80 + 10 + '%';
+                pest.style.top = Math.random() * 80 + 10 + '%';
+                
+                pest.onclick = () => {
+                    minigameScore += 3;
+                    document.getElementById('minigameScore').textContent = minigameScore;
+                    pest.textContent = '💥';
+                    setTimeout(() => pest.remove(), 200);
+                };
+                
+                area.appendChild(pest);
+                setTimeout(() => pest.remove(), 2000);
+            }
+            
+            minigameTimeout = setInterval(spawnPest, 400);
+        }
+
+        function startWaterGame(area) {
+            const plants = [];
+            for (let i = 0; i < 12; i++) {
+                const plant = document.createElement('div');
+                plant.className = 'absolute text-3xl cursor-pointer transition-all';
+                plant.textContent = '🥀';
+                plant.style.left = (10 + (i % 4) * 25) + '%';
+                plant.style.top = (20 + Math.floor(i / 4) * 30) + '%';
+                plant.dataset.watered = 'false';
+                
+                plant.onclick = () => {
+                    if (plant.dataset.watered === 'false') {
+                        plant.textContent = '🌱';
+                        plant.dataset.watered = 'true';
+                        minigameScore += 5;
+                        document.getElementById('minigameScore').textContent = minigameScore;
+                    }
+                };
+                
+                plants.push(plant);
+                area.appendChild(plant);
+            }
+        }
+
+        function startElectricGame(area) {
+            const nodes = [];
+            for (let i = 0; i < 8; i++) {
+                const node = document.createElement('div');
+                node.className = 'absolute text-3xl cursor-pointer transition-all';
+                node.textContent = '🔴';
+                node.style.left = (10 + (i % 4) * 25) + '%';
+                node.style.top = (25 + Math.floor(i / 4) * 40) + '%';
+                node.dataset.active = 'false';
+                
+                node.onclick = () => {
+                    if (node.dataset.active === 'false') {
+                        node.textContent = '⚡';
+                        node.dataset.active = 'true';
+                        minigameScore += 10;
+                        document.getElementById('minigameScore').textContent = minigameScore;
+                    }
+                };
+                
+                nodes.push(node);
+                area.appendChild(node);
+            }
+        }
+
+        function endMinigame() {
+            clearInterval(minigameInterval);
+            clearInterval(minigameTimeout);
+            
+            let reward = '';
+            if (minigameType === 'catch') {
+                gameData.money += minigameScore;
+                reward = `+${minigameScore}💰`;
+            } else if (minigameType === 'pest') {
+                gameData.money += minigameScore;
+                reward = `+${minigameScore}💰`;
+            } else if (minigameType === 'water') {
+                const energy = Math.min(minigameScore, 50);
+                gameData.energy = Math.min(gameData.maxEnergy, gameData.energy + energy);
+                reward = `+${energy}⚡`;
+            } else if (minigameType === 'electric') {
+                gameData.energy = Math.min(gameData.maxEnergy, gameData.energy + 30);
+                gameData.money += Math.floor(minigameScore / 2);
+                reward = `+30⚡ +${Math.floor(minigameScore / 2)}💰`;
+            }
+            
+            alert(`¡Juego terminado!\nPuntos: ${minigameScore}\nRecompensa: ${reward}`);
+            closeMinigame();
+            updateUI();
+        }
+
+        function closeMinigame() {
+            clearInterval(minigameInterval);
+            clearInterval(minigameTimeout);
+            document.getElementById('minigameModal').classList.add('hidden');
+            document.getElementById('minigameArea').innerHTML = '';
+        }
+
+        // ============ GUÍA ============
+        function nextGuideMessage() {
+            gameData.guideMessageIndex++;
+            if (gameData.guideMessageIndex >= guideMessages.length) {
+                gameData.guideMessageIndex = 0;
+            }
+            document.getElementById('guideText').textContent = guideMessages[gameData.guideMessageIndex];
+        }
+
+        function hideGuide() {
+            document.getElementById('guidePanel').classList.add('hidden');
+            document.getElementById('showGuideBtn').classList.remove('hidden');
+        }
+
+        function showGuide() {
+            document.getElementById('guidePanel').classList.remove('hidden');
+            document.getElementById('showGuideBtn').classList.add('hidden');
+        }
+    </script>
+</body>
+</html>
