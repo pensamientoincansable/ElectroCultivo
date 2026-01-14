@@ -1,0 +1,16 @@
+{
+  "name": "electro-cultivo-auth",
+  "version": "1.0.0",
+  "description": "Servidor de autenticación para Electro-Cultivo",
+  "main": "auth-server.js",
+  "scripts": {
+    "start": "node auth-server.js",
+    "dev": "node --watch auth-server.js"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.39.0",
+    "cors": "^2.8.5",
+    "dotenv": "^16.3.1",
+    "express": "^4.18.2"
+  }
+}

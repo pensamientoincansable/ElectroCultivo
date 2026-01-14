@@ -1,0 +1,802 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ElectroCultivo España - Juego de Agricultura</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Fredoka+One&family=Nunito:wght@400;600;700&family=Almendra:ital,wght@0,400;0,700;1,400;1,700&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="css/styles.css">
+</head>
+
+<body class="bg-gradient-to-br from-green-800 via-green-700 to-emerald-900 min-h-screen overflow-x-hidden">
+    <!-- Menú Principal -->
+    <div id="mainMenu"
+        class="fixed inset-0 flex items-center justify-center z-50 bg-gradient-to-br from-amber-700 via-green-800 to-emerald-900">
+        <div class="text-center p-8 max-w-2xl w-full">
+            <!-- Logo animado -->
+            <div class="mb-8 relative">
+                <div class="text-9xl mb-4 animate-pulse">🌾</div>
+                <div class="absolute top-0 right-1/4 text-5xl animate-bounce" style="animation-delay: 0.3s;">⚡</div>
+                <div class="absolute top-4 left-1/4 text-3xl animate-bounce" style="animation-delay: 0.7s;">🌱</div>
+            </div>
+
+            <h1 class="title-font text-5xl md:text-7xl text-yellow-300 mb-2 drop-shadow-lg animate-pulse">
+                ElectroCultivo
+            </h1>
+            <p class="text-2xl text-yellow-100 mb-8 font-semibold">España</p>
+
+            <!-- Botones del menú -->
+            <div class="space-y-4 max-w-md mx-auto">
+                <button onclick="startGame()"
+                    class="menu-btn w-full bg-gradient-to-r from-green-600 to-green-500 hover:from-green-500 hover:to-green-400 text-white font-bold text-2xl px-8 py-5 rounded-2xl shadow-2xl transform hover:scale-105 transition-all flex items-center justify-center gap-4 border-2 border-green-400">
+                    <span class="text-4xl">🎮</span>
+                    <span>JUGAR</span>
+                </button>
+
+                <button onclick="showCalendar()"
+                    class="menu-btn w-full bg-gradient-to-r from-amber-600 to-amber-500 hover:from-amber-500 hover:to-amber-400 text-white font-bold text-xl px-8 py-4 rounded-2xl shadow-xl transform hover:scale-105 transition-all flex items-center justify-center gap-4 border-2 border-amber-400">
+                    <span class="text-3xl">📅</span>
+                    <span>CALENDARIO DE CULTIVOS</span>
+                </button>
+
+                <button onclick="showOptions()"
+                    class="menu-btn w-full bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-500 hover:to-blue-400 text-white font-bold text-xl px-8 py-4 rounded-2xl shadow-xl transform hover:scale-105 transition-all flex items-center justify-center gap-4 border-2 border-blue-400">
+                    <span class="text-3xl">⚙️</span>
+                    <span>OPCIONES</span>
+                </button>
+
+                <button onclick="exitGame()"
+                    class="menu-btn w-full bg-gradient-to-r from-red-700 to-red-600 hover:from-red-600 hover:to-red-500 text-white font-bold text-xl px-8 py-4 rounded-2xl shadow-xl transform hover:scale-105 transition-all flex items-center justify-center gap-4 border-2 border-red-500">
+                    <span class="text-3xl">🚪</span>
+                    <span>SALIR</span>
+                </button>
+            </div>
+
+            <p class="text-green-300 mt-8 text-sm opacity-80">🍂 Cultiva la tierra con las técnicas ancestrales de la
+                electrocultura</p>
+            <p class="text-amber-200 mt-2 text-xs opacity-60">v2.0 - 15 regiones de España</p>
+        </div>
+    </div>
+
+    <!-- Contenedor Principal del Juego -->
+    <div id="gameContainer" class="hidden">
+        <!-- Barra Superior Fija -->
+        <header class="bg-gradient-to-r from-amber-900 to-amber-800 p-3 shadow-xl sticky top-0 z-50">
+            <div class="container mx-auto flex justify-between items-center flex-wrap gap-2">
+                <div class="flex items-center gap-4">
+                    <h1 class="title-font text-xl md:text-2xl text-yellow-300 cursor-pointer" onclick="showView('map')">
+                        🌾 ElectroCultivo</h1>
+                    <div id="seasonIndicator" class="px-3 py-1 rounded-full text-white font-bold text-sm bg-orange-700">
+                        🍂 Otoño
+                    </div>
+                </div>
+                <div class="flex gap-2 md:gap-4 items-center flex-wrap">
+                    <button onclick="showMainMenu()"
+                        class="bg-amber-600 hover:bg-amber-500 text-white px-3 py-1 rounded-lg font-bold flex items-center gap-1 transition-all shadow-md">
+                        <span>🏠</span><span class="hidden sm:inline">Menú</span>
+                    </button>
+                    <div class="bg-amber-950 px-3 py-1 rounded-lg flex items-center gap-1">
+                        <span class="text-xl">💰</span>
+                        <span id="money" class="text-yellow-400 font-bold text-lg">500</span>
+                    </div>
+                    <div class="bg-amber-950 px-3 py-1 rounded-lg flex items-center gap-1">
+                        <span class="text-xl">⚡</span>
+                        <span id="energy" class="text-blue-400 font-bold text-lg">100</span>
+                    </div>
+                    <div class="bg-amber-950 px-3 py-1 rounded-lg flex items-center gap-1">
+                        <span class="text-xl">⭐</span>
+                        <span id="level" class="text-green-400 font-bold text-lg">1</span>
+                    </div>
+                    <div class="bg-amber-950 px-3 py-1 rounded-lg hidden md:flex items-center gap-2">
+                        <div class="w-24 h-3 bg-gray-700 rounded-full overflow-hidden">
+                            <div id="xpBarHeader" class="h-full bg-purple-500 transition-all" style="width: 0%"></div>
+                        </div>
+                        <span id="xpText" class="text-purple-300 text-xs">0/100</span>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <!-- Navegación Principal -->
+        <nav class="bg-amber-800/90 p-2 sticky top-14 z-40 shadow-lg">
+            <div class="container mx-auto flex gap-2 justify-center flex-wrap">
+                <button onclick="showView('map')" id="navMap"
+                    class="nav-btn bg-green-700 hover:bg-green-600 text-white px-4 md:px-6 py-2 rounded-lg font-bold transition-all flex items-center gap-1">
+                    <span>🗺️</span><span class="hidden sm:inline">Mapa</span>
+                </button>
+                <button onclick="showView('farm')" id="navFarm"
+                    class="nav-btn bg-amber-700 hover:bg-amber-600 text-white px-4 md:px-6 py-2 rounded-lg font-bold transition-all flex items-center gap-1">
+                    <span>🌱</span><span class="hidden sm:inline">Granja</span>
+                </button>
+                <button onclick="showView('minigame')" id="navMinigame"
+                    class="nav-btn bg-pink-700 hover:bg-pink-600 text-white px-4 md:px-6 py-2 rounded-lg font-bold transition-all flex items-center gap-1">
+                    <span>🎮</span><span class="hidden sm:inline">Minijuegos</span>
+                </button>
+                <button onclick="showView('shop')" id="navShop"
+                    class="nav-btn bg-blue-700 hover:bg-blue-600 text-white px-4 md:px-6 py-2 rounded-lg font-bold transition-all flex items-center gap-1">
+                    <span>🛒</span><span class="hidden sm:inline">Tienda</span>
+                </button>
+                <button onclick="showView('electroculture')" id="navElectro"
+                    class="nav-btn bg-yellow-600 hover:bg-yellow-500 text-white px-4 md:px-6 py-2 rounded-lg font-bold transition-all flex items-center gap-1">
+                    <span>⚡</span><span class="hidden sm:inline">Electro</span>
+                </button>
+                <button onclick="showView('inventory')" id="navInventory"
+                    class="nav-btn bg-purple-700 hover:bg-purple-600 text-white px-4 md:px-6 py-2 rounded-lg font-bold transition-all flex items-center gap-1">
+                    <span>📦</span><span class="hidden sm:inline">Inventario</span>
+                </button>
+            </div>
+        </nav>
+
+        <!-- Vista del Mapa de España -->
+        <div id="mapView" class="container mx-auto p-4">
+            <div class="text-center mb-6">
+                <h2 class="title-font text-3xl text-yellow-300 mb-2">🗺️ Regiones Agrícolas de España</h2>
+                <p class="text-green-200">Cada región tiene su propia granja y cultivos únicos</p>
+                <div class="mt-3 inline-flex items-center gap-4 bg-amber-900/50 px-4 py-2 rounded-full">
+                    <span class="text-yellow-300 font-bold">Regiones desbloqueadas:</span>
+                    <span id="unlockedCount" class="text-white text-xl font-bold">1 / 15</span>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 xl:grid-cols-4 gap-6">
+                <div class="xl:col-span-3 bg-gradient-to-b from-blue-400 to-blue-600 rounded-2xl p-4 shadow-2xl">
+                    <div class="relative w-full bg-blue-500 rounded-xl overflow-hidden" style="padding-bottom: 70%;">
+                        <svg viewBox="0 0 800 600" class="absolute inset-0 w-full h-full">
+                            <!-- Regiones de España (colores dinámicos via JS) -->
+                            <path id="region-galicia" class="region locked"
+                                d="M100,120 L180,100 L210,130 L200,190 L150,210 L110,200 L90,160 Z"
+                                onclick="selectRegion('galicia')" />
+                            <path id="region-asturias" class="region locked"
+                                d="M180,100 L280,85 L310,110 L280,145 L200,155 L190,135 Z"
+                                onclick="selectRegion('asturias')" />
+                            <path id="region-cantabria" class="region locked"
+                                d="M300,85 L380,75 L395,100 L370,130 L300,135 L300,110 Z"
+                                onclick="selectRegion('cantabria')" />
+                            <path id="region-paisvasco" class="region locked"
+                                d="M380,75 L440,70 L460,95 L445,125 L395,120 L395,100 Z"
+                                onclick="selectRegion('paisvasco')" />
+                            <path id="region-navarra" class="region locked"
+                                d="M440,70 L520,65 L560,105 L530,145 L460,135 L460,100 Z"
+                                onclick="selectRegion('navarra')" />
+                            <path id="region-larioja" class="region locked"
+                                d="M370,130 L445,125 L460,135 L460,170 L400,180 L370,160 Z"
+                                onclick="selectRegion('larioja')" />
+                            <path id="region-aragon" class="region locked"
+                                d="M460,135 L560,105 L630,125 L650,210 L630,310 L540,330 L480,290 L460,210 Z"
+                                onclick="selectRegion('aragon')" />
+                            <path id="region-cataluna" class="region locked"
+                                d="M630,125 L730,105 L760,190 L730,290 L650,310 L630,210 Z"
+                                onclick="selectRegion('cataluna')" />
+                            <path id="region-castillayleon" class="region locked"
+                                d="M150,195 L280,145 L370,145 L400,180 L425,250 L380,310 L280,330 L180,310 L135,260 L135,225 Z"
+                                onclick="selectRegion('castillayleon')" />
+                            <path id="region-madrid" class="region locked"
+                                d="M320,300 L380,290 L400,330 L370,370 L320,350 Z" onclick="selectRegion('madrid')" />
+                            <path id="region-castillalamancha" class="region"
+                                d="M280,330 L425,290 L540,330 L570,390 L530,460 L380,470 L300,430 L275,370 Z"
+                                onclick="selectRegion('castillalamancha')" />
+                            <path id="region-extremadura" class="region locked"
+                                d="M125,290 L185,310 L275,350 L285,410 L245,460 L165,460 L110,410 Z"
+                                onclick="selectRegion('extremadura')" />
+                            <path id="region-valencia" class="region locked"
+                                d="M540,330 L650,290 L690,350 L670,430 L610,460 L540,430 L550,390 Z"
+                                onclick="selectRegion('valencia')" />
+                            <path id="region-murcia" class="region locked"
+                                d="M540,430 L610,460 L630,500 L565,515 L505,485 L525,455 Z"
+                                onclick="selectRegion('murcia')" />
+                            <path id="region-andalucia" class="region locked"
+                                d="M105,410 L245,460 L385,460 L525,485 L545,515 L485,550 L300,550 L150,520 L85,460 L85,430 Z"
+                                onclick="selectRegion('andalucia')" />
+
+                            <!-- Contenedor para Etiquetas y Emojis (Generados por JS) -->
+                            <g id="mapLabels" style="pointer-events:none;"></g>
+
+
+                            <!-- Leyenda -->
+                            <rect x="20" y="510" width="140" height="70" fill="rgba(0,0,0,0.6)" rx="8" />
+                            <text x="90" y="530" fill="#ffd700" font-size="10" text-anchor="middle"
+                                font-weight="bold">LEYENDA</text>
+                            <circle cx="35" cy="545" r="5" fill="#ffd700" />
+                            <text x="50" y="548" fill="white" font-size="9">Región Actual</text>
+                            <circle cx="35" cy="565" r="5" fill="#666" opacity="0.6" />
+                            <text x="50" y="568" fill="white" font-size="9">Bloqueada</text>
+                        </svg>
+                    </div>
+                </div>
+
+                <div class="xl:col-span-1 space-y-4">
+                    <div id="regionInfo" class="bg-amber-900/80 rounded-2xl p-5">
+                        <h3 class="title-font text-xl text-yellow-300 mb-3">📍 Selecciona una Región</h3>
+                        <p class="text-green-200 text-sm">Haz clic en una región del mapa para ver información.</p>
+                    </div>
+
+                    <div class="bg-amber-900/80 rounded-2xl p-5">
+                        <h3 class="title-font text-lg text-yellow-300 mb-3">📅 Temporada Actual</h3>
+                        <div id="seasonInfoPanel" class="bg-amber-950/50 rounded-xl p-3 text-center">
+                            <p class="text-4xl mb-2">🍂</p>
+                            <p class="text-white font-bold text-lg">Otoño</p>
+                            <p class="text-amber-300 text-xs mt-1">Ideal para cereales y legumbres</p>
+                        </div>
+                    </div>
+
+                    <div class="bg-amber-900/80 rounded-2xl p-5">
+                        <h3 class="title-font text-lg text-yellow-300 mb-3">🏆 Progreso</h3>
+                        <div class="space-y-3">
+                            <div class="flex justify-between text-sm">
+                                <span class="text-green-200">Nivel</span>
+                                <span id="levelProgress" class="text-white font-bold text-xl">1</span>
+                            </div>
+                            <div class="w-full bg-gray-700 rounded-full h-4">
+                                <div id="xpBar"
+                                    class="bg-gradient-to-r from-purple-600 to-purple-400 h-4 rounded-full transition-all"
+                                    style="width: 0%"></div>
+                            </div>
+                            <p class="text-gray-400 text-xs text-center">XP: <span id="xpProgress">0</span>/<span
+                                    id="xpNeededProgress">100</span></p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Vista de Granja (Pantalla Completa) -->
+        <div id="farmView" class="hidden">
+            <div id="farmFullscreen" class="farm-container autumn min-h-screen relative">
+                <!-- Elementos decorativos -->
+                <div class="sun"></div>
+                <div class="cloud" style="top: 50px; width: 100px; height: 40px; animation-delay: 0s;"></div>
+                <div class="cloud" style="top: 80px; width: 80px; height: 30px; animation-delay: -7s;"></div>
+                <div class="cloud" style="top: 30px; width: 120px; height: 50px; animation-delay: -14s;"></div>
+                <div class="windmill hidden md:block">🌀</div>
+                <div class="barn hidden md:block">
+                    <div class="text-6xl">🏠</div>
+                </div>
+
+                <!-- Cabecera de la Granja -->
+                <div class="bg-gradient-to-r from-amber-900/95 to-amber-800/95 p-3 sticky top-0 z-20 shadow-xl">
+                    <div class="container mx-auto flex justify-between items-center flex-wrap gap-2">
+                        <div class="flex items-center gap-3">
+                            <button onclick="showView('map')"
+                                class="bg-gray-700 hover:bg-gray-600 text-white px-3 py-2 rounded-lg transition-all">
+                                ← Mapa
+                            </button>
+                            <div>
+                                <h2 class="title-font text-xl text-yellow-300" id="farmRegionTitle">🌾 Granja de
+                                    Castilla-La Mancha</h2>
+                                <p class="text-green-200 text-sm">📅 Día <span id="currentDay">1</span> | <span
+                                        id="currentSeasonText">🍂 Otoño</span> | Año <span id="currentYear">1</span></p>
+                            </div>
+                        </div>
+                        <div class="flex gap-2 items-center flex-wrap">
+                            <div id="electrocultureStatus" class="bg-gray-700 px-3 py-1 rounded-lg text-sm">
+                                <span class="text-gray-400">⚡ Sin electrocultura</span>
+                            </div>
+                            <button onclick="advanceDay()"
+                                class="bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded-lg font-bold flex items-center gap-1 transition-all">
+                                ⏭️ Siguiente Día
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Contenido Principal de la Granja -->
+                <div class="container mx-auto p-4 relative z-10">
+                    <div class="grid grid-cols-1 lg:grid-cols-5 gap-4">
+                        <!-- Campo de Cultivo -->
+                        <div class="lg:col-span-4">
+                            <div class="field-area p-4 md:p-6">
+                                <div class="flex justify-between items-center mb-4 flex-wrap gap-2">
+                                    <div>
+                                        <h3 class="text-white font-bold text-xl">🌾 Campo de Cultivo</h3>
+                                        <p class="text-amber-200 text-sm">Parcelas: <span id="plotCount">12</span></p>
+                                    </div>
+                                    <div class="flex gap-2 flex-wrap">
+                                        <button onclick="waterAll()"
+                                            class="bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded-lg font-bold flex items-center gap-1 transition-all shadow-lg">
+                                            💧 Regar Todo (10⚡)
+                                        </button>
+                                        <button onclick="harvestAll()"
+                                            class="bg-green-600 hover:bg-green-500 text-white px-4 py-2 rounded-lg font-bold flex items-center gap-1 transition-all shadow-lg">
+                                            🌾 Cosechar Todo
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <div id="farmGrid"
+                                    class="grid grid-cols-4 sm:grid-cols-5 md:grid-cols-6 lg:grid-cols-8 gap-3 md:gap-4">
+                                </div>
+
+                                <div class="mt-6 flex gap-3 flex-wrap justify-center">
+                                    <button onclick="expandFarm()"
+                                        class="bg-amber-700 hover:bg-amber-600 text-white px-6 py-3 rounded-xl font-bold transition-all shadow-lg">
+                                        ➕ Expandir Campo (500💰)
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div class="mt-4 bg-black/40 backdrop-blur-sm rounded-xl p-4">
+                                <div class="flex items-center gap-4 justify-center flex-wrap text-sm">
+                                    <span class="text-green-300">🌱 Haz clic en <b>+</b> para plantar</span>
+                                    <span class="text-blue-300">💧 Riega para +50% velocidad</span>
+                                    <span class="text-yellow-300">✨ Cosecha cuando brille</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Panel Lateral -->
+                        <div class="lg:col-span-1">
+                            <div class="bg-amber-900/90 backdrop-blur-sm rounded-2xl p-4 sticky top-32 space-y-4">
+                                <div>
+                                    <h3 class="title-font text-lg text-yellow-300 mb-3">🌱 Mis Semillas</h3>
+                                    <div id="seedList" class="space-y-2 max-h-48 overflow-y-auto">
+                                    </div>
+                                    <button onclick="showView('shop')"
+                                        class="mt-3 w-full bg-blue-600 hover:bg-blue-500 text-white py-2 rounded-lg text-sm font-bold transition-all">
+                                        🛒 Comprar Semillas
+                                    </button>
+                                </div>
+
+                                <div class="pt-4 border-t border-amber-700">
+                                    <h4 class="text-amber-300 font-bold text-sm mb-2">📦 Almacén</h4>
+                                    <div id="quickInventory" class="space-y-1 max-h-40 overflow-y-auto text-sm">
+                                        <p class="text-gray-400">Vacío</p>
+                                    </div>
+                                    <p class="text-gray-500 text-xs mt-2 text-center">Total: <span
+                                            id="totalHarvestValue">0</span>💰</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="fence"></div>
+            </div>
+        </div>
+
+        <!-- Vista de Inventario -->
+        <div id="inventoryView" class="container mx-auto p-4 hidden">
+            <div class="text-center mb-6">
+                <h2 class="title-font text-3xl text-yellow-300 mb-2">📦 Inventario de Cosechas</h2>
+                <p class="text-green-200">Tus productos cosechados con rendimientos realistas</p>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div class="bg-amber-900/80 rounded-2xl p-5">
+                    <h3 class="title-font text-xl text-green-300 mb-4">🌾 Productos</h3>
+                    <div id="inventoryGrid" class="grid grid-cols-2 sm:grid-cols-3 gap-3 max-h-96 overflow-y-auto">
+                        <p class="text-gray-400 col-span-full text-center py-8">Sin cosechas aún</p>
+                    </div>
+                </div>
+
+                <div class="bg-amber-900/80 rounded-2xl p-5">
+                    <h3 class="title-font text-xl text-yellow-300 mb-4">💰 Vender Productos</h3>
+                    <div id="sellInventory" class="space-y-2 max-h-96 overflow-y-auto">
+                        <p class="text-gray-400 text-center py-8">Cosecha productos para venderlos aquí</p>
+                    </div>
+                    <div class="mt-4 pt-4 border-t border-amber-700">
+                        <div class="flex justify-between items-center">
+                            <span class="text-white font-bold">Valor Total:</span>
+                            <span id="totalInventoryValue" class="text-yellow-400 font-bold text-2xl">0 💰</span>
+                        </div>
+                        <button onclick="sellAll()"
+                            class="mt-3 w-full bg-green-600 hover:bg-green-500 text-white py-3 rounded-xl font-bold transition-all">
+                            💰 Vender Todo
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="mt-6 bg-black/40 rounded-2xl p-5">
+                <h3 class="title-font text-xl text-yellow-300 mb-4">📊 Guía de Rendimientos por Planta</h3>
+                <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3 text-sm">
+                    <div class="bg-green-900/50 p-3 rounded-lg text-center">
+                        <span class="text-2xl">🍅</span>
+                        <p class="text-white font-bold">Tomate</p>
+                        <p class="text-green-300">15-25 unid.</p>
+                    </div>
+                    <div class="bg-green-900/50 p-3 rounded-lg text-center">
+                        <span class="text-2xl">🍇</span>
+                        <p class="text-white font-bold">Uva</p>
+                        <p class="text-green-300">8-15 kg</p>
+                    </div>
+                    <div class="bg-green-900/50 p-3 rounded-lg text-center">
+                        <span class="text-2xl">🌾</span>
+                        <p class="text-white font-bold">Trigo</p>
+                        <p class="text-green-300">3-6 kg</p>
+                    </div>
+                    <div class="bg-green-900/50 p-3 rounded-lg text-center">
+                        <span class="text-2xl">🍊</span>
+                        <p class="text-white font-bold">Naranja</p>
+                        <p class="text-green-300">80-150 unid.</p>
+                    </div>
+                    <div class="bg-green-900/50 p-3 rounded-lg text-center">
+                        <span class="text-2xl">🫒</span>
+                        <p class="text-white font-bold">Aceituna</p>
+                        <p class="text-green-300">15-30 kg</p>
+                    </div>
+                    <div class="bg-green-900/50 p-3 rounded-lg text-center">
+                        <span class="text-2xl">🌸</span>
+                        <p class="text-white font-bold">Azafrán</p>
+                        <p class="text-green-300">0.5-1.5 g</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Vista de Minijuegos -->
+        <div id="minigameView" class="container mx-auto p-4 hidden">
+            <div class="text-center mb-6">
+                <h2 class="title-font text-3xl text-yellow-300 mb-2">🎮 Minijuegos del Campo</h2>
+                <p class="text-green-200">¡Gana dinero y energía extra mientras te diviertes!</p>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-4xl mx-auto">
+                <div
+                    class="bg-gradient-to-br from-green-900/80 to-emerald-900/80 rounded-2xl p-6 border-2 border-green-600">
+                    <div class="text-4xl mb-3">🧺</div>
+                    <h3 class="title-font text-2xl text-yellow-300 mb-2">Atrapa la Cosecha</h3>
+                    <p class="text-green-200 text-sm mb-4">Haz clic en las frutas que caen. ¡Evita las piedras!</p>
+                    <div class="bg-black/30 rounded-xl p-3 mb-4">
+                        <p class="text-amber-300 text-sm">🎁 Recompensa: <span class="text-white font-bold">+5💰 por
+                                fruta</span></p>
+                        <p class="text-amber-300 text-sm">⚡ Coste: <span class="text-white font-bold">10 energía</span>
+                        </p>
+                    </div>
+                    <button onclick="startMinigame('catch')"
+                        class="w-full bg-green-600 hover:bg-green-500 text-white py-3 rounded-xl font-bold text-lg transition-all">
+                        🎯 ¡Jugar!
+                    </button>
+                </div>
+
+                <div class="bg-gradient-to-br from-red-900/80 to-orange-900/80 rounded-2xl p-6 border-2 border-red-600">
+                    <div class="text-4xl mb-3">🐛</div>
+                    <h3 class="title-font text-2xl text-yellow-300 mb-2">Elimina Plagas</h3>
+                    <p class="text-green-200 text-sm mb-4">Aplasta los insectos antes de que se coman tus cultivos.</p>
+                    <div class="bg-black/30 rounded-xl p-3 mb-4">
+                        <p class="text-amber-300 text-sm">🎁 Recompensa: <span class="text-white font-bold">+3💰 por
+                                plaga</span></p>
+                        <p class="text-amber-300 text-sm">⚡ Coste: <span class="text-white font-bold">5 energía</span>
+                        </p>
+                    </div>
+                    <button onclick="startMinigame('pest')"
+                        class="w-full bg-red-600 hover:bg-red-500 text-white py-3 rounded-xl font-bold text-lg transition-all">
+                        🎯 ¡Jugar!
+                    </button>
+                </div>
+
+                <div class="bg-gradient-to-br from-blue-900/80 to-cyan-900/80 rounded-2xl p-6 border-2 border-blue-600">
+                    <div class="text-4xl mb-3">💧</div>
+                    <h3 class="title-font text-2xl text-yellow-300 mb-2">Riego Rápido</h3>
+                    <p class="text-green-200 text-sm mb-4">Riega las plantas marchitas antes de que se sequen.</p>
+                    <div class="bg-black/30 rounded-xl p-3 mb-4">
+                        <p class="text-amber-300 text-sm">🎁 Recompensa: <span class="text-white font-bold">+25⚡
+                                energía</span></p>
+                        <p class="text-amber-300 text-sm">⚡ Coste: <span class="text-white font-bold">GRATIS</span></p>
+                    </div>
+                    <button onclick="startMinigame('water')"
+                        class="w-full bg-blue-600 hover:bg-blue-500 text-white py-3 rounded-xl font-bold text-lg transition-all">
+                        🎯 ¡Jugar!
+                    </button>
+                </div>
+
+                <div
+                    class="bg-gradient-to-br from-purple-900/80 to-yellow-900/80 rounded-2xl p-6 border-2 border-purple-600">
+                    <div class="text-4xl mb-3">⚡</div>
+                    <h3 class="title-font text-2xl text-yellow-300 mb-2">Carga Eléctrica</h3>
+                    <p class="text-green-200 text-sm mb-4">Activa los nodos de electrocultura en secuencia.</p>
+                    <div class="bg-black/30 rounded-xl p-3 mb-4">
+                        <p class="text-amber-300 text-sm">🎁 Recompensa: <span class="text-white font-bold">+40⚡
+                                +25💰</span></p>
+                        <p class="text-amber-300 text-sm">⚡ Coste: <span class="text-white font-bold">15 energía</span>
+                        </p>
+                    </div>
+                    <button onclick="startMinigame('electric')"
+                        class="w-full bg-purple-600 hover:bg-purple-500 text-white py-3 rounded-xl font-bold text-lg transition-all">
+                        🎯 ¡Jugar!
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Vista de Tienda -->
+        <div id="shopView" class="container mx-auto p-4 hidden">
+            <div class="text-center mb-6">
+                <h2 class="title-font text-3xl text-yellow-300 mb-2">🛒 Tienda del Pueblo</h2>
+                <p class="text-green-200">Compra semillas de <span id="shopRegionName"
+                        class="text-yellow-300 font-bold">Castilla-La Mancha</span></p>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                <div class="bg-amber-900/80 rounded-2xl p-5">
+                    <h3 class="title-font text-xl text-green-300 mb-4">🌱 Semillas Disponibles</h3>
+                    <div id="shopSeeds" class="space-y-2 max-h-96 overflow-y-auto">
+                    </div>
+                </div>
+
+                <div class="bg-amber-900/80 rounded-2xl p-5">
+                    <h3 class="title-font text-xl text-blue-300 mb-4">🔧 Herramientas</h3>
+                    <div id="shopTools" class="space-y-2 max-h-96 overflow-y-auto">
+                    </div>
+                </div>
+
+                <div class="bg-amber-900/80 rounded-2xl p-5">
+                    <h3 class="title-font text-xl text-yellow-300 mb-4">⚡ Electrocultura</h3>
+                    <div id="shopElectro" class="space-y-2 max-h-96 overflow-y-auto">
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Vista de Electrocultura -->
+        <div id="electrocultureView" class="container mx-auto p-4 hidden">
+            <div class="text-center mb-6">
+                <h2 class="title-font text-3xl text-yellow-300 mb-2">⚡ Centro de Electrocultura</h2>
+                <p class="text-green-200">Técnicas eléctricas ancestrales para potenciar tus cultivos</p>
+            </div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <div class="bg-gradient-to-br from-purple-900/80 to-blue-900/80 rounded-2xl p-6">
+                    <h3 class="title-font text-xl text-yellow-300 mb-4">📡 Mis Equipos</h3>
+                    <div id="electroTechniques" class="space-y-3">
+                    </div>
+                </div>
+
+                <div class="space-y-4">
+                    <div class="bg-gradient-to-br from-green-900/80 to-emerald-900/80 rounded-2xl p-6">
+                        <h3 class="title-font text-xl text-green-300 mb-4">✨ Beneficios Activos</h3>
+                        <div id="activeBenefits" class="space-y-2">
+                            <p class="text-gray-400">Ningún equipo instalado</p>
+                        </div>
+                    </div>
+
+                    <div class="bg-black/40 rounded-2xl p-6">
+                        <h4 class="text-yellow-300 font-bold mb-3">📖 ¿Qué es la Electrocultura?</h4>
+                        <p class="text-green-200 text-sm leading-relaxed mb-3">
+                            La electrocultura utiliza campos electromagnéticos y electricidad atmosférica para estimular
+                            el crecimiento vegetal.
+                            Estas técnicas ancestrales pueden aumentar los rendimientos hasta un 300%.
+                        </p>
+                        <ul class="text-green-300 text-sm space-y-1">
+                            <li>📡 <b>Antenas de cobre</b>: Captan electricidad del aire</li>
+                            <li>🧲 <b>Polos magnéticos</b>: Orientan nutrientes a las raíces</li>
+                            <li>🔺 <b>Pirámides</b>: Concentran energía cósmica</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Guía del Agricultor -->
+        <div id="guidePanel" class="fixed bottom-4 left-4 z-40 max-w-sm">
+            <div class="guide-bubble p-4 shadow-xl">
+                <p id="guideText" class="text-gray-700 text-sm">¡Bienvenido, joven agricultor! Soy Pedro. Es otoño, la
+                    mejor época para sembrar cereales. Te he dado semillas de trigo, cebada y el valioso azafrán de La
+                    Mancha. ¡Vamos a la granja!</p>
+            </div>
+            <div class="flex items-end mt-2 gap-2">
+                <div class="text-5xl">👨‍🌾</div>
+                <div class="flex-1">
+                    <p class="text-yellow-300 font-bold text-sm">Pedro</p>
+                    <p class="text-green-300 text-xs">50 años de experiencia</p>
+                </div>
+                <button onclick="nextGuideMessage()"
+                    class="bg-green-600 hover:bg-green-500 text-white px-3 py-1 rounded-full text-sm transition-all">→</button>
+                <button onclick="hideGuide()"
+                    class="bg-red-500 hover:bg-red-400 text-white px-2 py-1 rounded-full text-sm transition-all">✕</button>
+            </div>
+        </div>
+        <button id="showGuideBtn" onclick="showGuide()"
+            class="fixed bottom-4 left-4 z-30 bg-amber-600 hover:bg-amber-500 text-white p-4 rounded-full shadow-xl hidden text-3xl transition-all">
+            👨‍🌾
+        </button>
+    </div>
+
+    <!-- Modal de Región -->
+    <div id="regionModal" class="fixed inset-0 z-50 hidden">
+        <div class="modal-overlay absolute inset-0" onclick="closeRegionModal()"></div>
+        <div
+            class="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-gradient-to-br from-amber-900 to-amber-800 rounded-2xl p-6 max-w-lg w-full mx-4 shadow-2xl max-h-[90vh] overflow-y-auto">
+            <button onclick="closeRegionModal()"
+                class="absolute top-4 right-4 text-white hover:text-red-400 text-2xl">✕</button>
+            <div id="regionModalContent"></div>
+        </div>
+    </div>
+
+    <!-- Modal de Plantación -->
+    <div id="plantModal" class="fixed inset-0 z-50 hidden">
+        <div class="modal-overlay absolute inset-0" onclick="closePlantModal()"></div>
+        <div
+            class="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-gradient-to-br from-green-900 to-green-800 rounded-2xl p-6 max-w-md w-full mx-4 shadow-2xl max-h-[80vh] overflow-hidden">
+            <button onclick="closePlantModal()"
+                class="absolute top-4 right-4 text-white hover:text-red-400 text-2xl">✕</button>
+            <h3 class="title-font text-xl text-yellow-300 mb-4">🌱 Selecciona Semilla</h3>
+            <div id="plantModalSeeds" class="space-y-2 max-h-96 overflow-y-auto pr-2">
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal de Minijuego -->
+    <div id="minigameModal" class="fixed inset-0 z-50 hidden">
+        <div class="modal-overlay absolute inset-0"></div>
+        <div
+            class="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-gradient-to-br from-green-900 to-emerald-800 rounded-2xl p-6 max-w-2xl w-full mx-4 shadow-2xl">
+            <div class="flex justify-between items-center mb-4">
+                <h3 id="minigameTitle" class="title-font text-2xl text-yellow-300">🎮 Minijuego</h3>
+                <div class="flex items-center gap-4">
+                    <div class="bg-black/30 px-4 py-2 rounded-lg">
+                        <span class="text-yellow-300">Puntos: </span>
+                        <span id="minigameScore" class="text-white font-bold text-xl">0</span>
+                    </div>
+                    <div class="bg-black/30 px-4 py-2 rounded-lg">
+                        <span class="text-blue-300">⏱️ </span>
+                        <span id="minigameTimer" class="text-white font-bold text-xl">30</span>s
+                    </div>
+                </div>
+            </div>
+            <div id="minigameArea" class="minigame-container">
+            </div>
+            <div class="mt-4 flex justify-center">
+                <button onclick="closeMinigame()"
+                    class="bg-red-600 hover:bg-red-500 text-white px-8 py-2 rounded-lg font-bold transition-all">
+                    ✕ Salir
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Overlay de Cosecha Realista -->
+    <div id="harvestOverlay" class="hidden">
+        <div class="text-center mb-10">
+            <h2 id="harvestTitle" class="title-font text-5xl text-yellow-300 drop-shadow-lg mb-2">🍎 ¡Cosecha el Fruto!
+            </h2>
+            <p id="harvestDesc" class="text-green-200 text-xl font-bold">¡Haz clic en cada fruto para recogerlo!</p>
+        </div>
+        <div id="harvestFruitArea"
+            class="relative w-full max-w-4xl h-[60vh] flex flex-wrap justify-center items-center gap-10">
+        </div>
+        <div class="mt-10">
+            <div class="bg-black/50 px-8 py-4 rounded-full border-2 border-yellow-500">
+                <span class="text-2xl text-white">📦 Recogidos: </span>
+                <span id="collectedCount" class="text-3xl text-yellow-400 font-bold">0</span>
+                <span id="totalToCollect" class="text-3xl text-gray-400 font-bold"> / 10</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Vista del Calendario de Cultivos -->
+    <div id="calendarView"
+        class="fixed inset-0 z-50 hidden bg-gradient-to-br from-amber-800 via-green-900 to-emerald-900 overflow-y-auto">
+        <div class="container mx-auto p-4">
+            <div class="flex justify-between items-center mb-6">
+                <h2 class="title-font text-3xl text-yellow-300">📅 Calendario de Cultivos</h2>
+                <button onclick="closeCalendar()"
+                    class="bg-red-600 hover:bg-red-500 text-white px-6 py-2 rounded-xl font-bold">
+                    ✕ Cerrar
+                </button>
+            </div>
+
+            <div class="bg-black/30 rounded-2xl p-4 mb-6">
+                <p class="text-green-200 text-center">📖 Guía completa de cultivos. Se desbloquean al comprar semillas.
+                </p>
+                <p class="text-amber-300 text-center text-sm mt-2">🔓 Cultivos desbloqueados: <span
+                        id="unlockedCropsCount">0</span> / <span id="totalCropsCount">0</span></p>
+            </div>
+
+            <div id="calendarGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                <!-- Crop cards generated dynamically -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal de Opciones -->
+    <div id="optionsModal" class="fixed inset-0 z-50 hidden">
+        <div class="modal-overlay absolute inset-0" onclick="closeOptions()"></div>
+        <div
+            class="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-gradient-to-br from-blue-900 to-blue-800 rounded-2xl p-6 max-w-md w-full mx-4 shadow-2xl">
+            <button onclick="closeOptions()"
+                class="absolute top-4 right-4 text-white hover:text-red-400 text-2xl">✕</button>
+
+            <h3 class="title-font text-2xl text-yellow-300 mb-6 text-center">⚙️ Opciones</h3>
+
+            <div class="space-y-6">
+                <!-- Sonido -->
+                <div class="bg-black/30 rounded-xl p-4">
+                    <div class="flex justify-between items-center">
+                        <div class="flex items-center gap-3">
+                            <span class="text-3xl">🔊</span>
+                            <div>
+                                <p class="text-white font-bold">Sonido</p>
+                                <p class="text-gray-400 text-sm">Efectos de sonido</p>
+                            </div>
+                        </div>
+                        <button id="soundToggle" onclick="toggleSound()"
+                            class="w-16 h-8 rounded-full bg-green-500 relative transition-all">
+                            <span
+                                class="absolute top-1 left-1 w-6 h-6 bg-white rounded-full transition-all transform translate-x-8"></span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Música -->
+                <div class="bg-black/30 rounded-xl p-4">
+                    <div class="flex justify-between items-center">
+                        <div class="flex items-center gap-3">
+                            <span class="text-3xl">🎵</span>
+                            <div>
+                                <p class="text-white font-bold">Música</p>
+                                <p class="text-gray-400 text-sm">Música de fondo</p>
+                            </div>
+                        </div>
+                        <button id="musicToggle" onclick="toggleMusic()"
+                            class="w-16 h-8 rounded-full bg-green-500 relative transition-all">
+                            <span
+                                class="absolute top-1 left-1 w-6 h-6 bg-white rounded-full transition-all transform translate-x-8"></span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Volumen -->
+                <div class="bg-black/30 rounded-xl p-4">
+                    <div class="flex items-center gap-3 mb-3">
+                        <span class="text-3xl">🔈</span>
+                        <p class="text-white font-bold">Volumen: <span id="volumeValue">80</span>%</p>
+                    </div>
+                    <input type="range" id="volumeSlider" min="0" max="100" value="80"
+                        class="w-full h-3 bg-gray-700 rounded-full appearance-none cursor-pointer"
+                        oninput="updateVolume(this.value)">
+                </div>
+            </div>
+
+            <div class="mt-6 text-center">
+                <button onclick="saveSettings()"
+                    class="bg-green-600 hover:bg-green-500 text-white px-8 py-3 rounded-xl font-bold text-lg">
+                    💾 Guardar
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal de Elección de Inicio -->
+    <div id="loginChoiceModal" class="fixed inset-0 z-[60] hidden">
+        <div class="modal-overlay absolute inset-0 bg-black/80 backdrop-blur-md"></div>
+        <div
+            class="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-gradient-to-br from-amber-900 to-amber-800 rounded-2xl p-8 max-w-md w-full mx-4 shadow-2xl text-center">
+            <h3 class="title-font text-3xl text-yellow-300 mb-6">¿Cómo quieres jugar?</h3>
+
+            <div class="space-y-4">
+                <button onclick="loginWithGoogle()"
+                    class="w-full bg-white hover:bg-gray-100 text-gray-800 font-bold py-4 px-6 rounded-xl shadow-lg transform hover:scale-105 transition-all flex items-center justify-center gap-4">
+                    <img src="https://www.google.com/favicon.ico" alt="Google" class="w-6 h-6">
+                    <span>Continuar con Google</span>
+                </button>
+
+                <div class="flex items-center gap-4 text-amber-500/50 my-2">
+                    <div class="h-px bg-amber-500/30 flex-1"></div>
+                    <span>o</span>
+                    <div class="h-px bg-amber-500/30 flex-1"></div>
+                </div>
+
+                <button onclick="startLocalGame()"
+                    class="w-full bg-green-600 hover:bg-green-500 text-white font-bold py-4 px-6 rounded-xl shadow-lg transform hover:scale-105 transition-all flex items-center justify-center gap-4 border-2 border-green-400">
+                    <span class="text-2xl">💾</span>
+                    <span>Jugar en Local (Caché)</span>
+                </button>
+            </div>
+
+            <p class="mt-8 text-amber-200/60 text-sm">
+                * El modo local guarda tu progreso en este navegador solamente.
+            </p>
+        </div>
+    </div>
+
+    <!-- JavaScript Files -->
+    <script src="js/data.js"></script>
+    <script src="js/map.js"></script>
+    <script src="js/game.js"></script>
+</body>
+
+</html>
