@@ -28,6 +28,7 @@ const gameData = {
     },
     unlockedCrops: [], // Crops unlocked in calendar (when seeds purchased)
     recyclingBonus: 1.0, // Multiplier for seeds gained from recycling
+    timeOfDay: 0, // 0 día · 1 atardecer · 2 noche · 3 amanecer
     selectedPlotIndex: null,
     guideMessageIndex: 0,
     isHolding: false,

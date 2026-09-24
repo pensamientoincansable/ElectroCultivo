@@ -20,6 +20,7 @@ function addRegionEmojis() {
             // Added explicit z-50 and cursor-pointer
             const group = document.createElement('div');
             group.className = 'label-group absolute transform -translate-x-1/2 -translate-y-1/2 flex flex-col items-center justify-center cursor-pointer transition-transform duration-200 hover:scale-125 z-50 pointer-events-auto';
+            group.dataset.region = id;
 
             // Calculate percentage position relative to 800x600 layout
             const leftPercent = (center.x / 800) * 100;
@@ -97,17 +98,61 @@ function colorizeMapRegions() {
     if (mapGroup) mapGroup.innerHTML = '';
 }
 
+/* Selecciona una región: muestra su ficha (cultivos, nivel, granja) en el
+   panel lateral y permite viajar a ella si está desbloqueada. */
 function selectRegion(regionId) {
-    if (!gameData.unlockedRegions.includes(regionId)) {
-        const region = regions[regionId];
-        alert(`🔒 ${region.name} está bloqueada.\n\nNecesitas nivel ${region.level} para desbloquearla.\nTu nivel actual: ${gameData.level}`);
-        return;
-    }
+    const region = regions[regionId];
+    if (!region) return;
+    const unlocked = gameData.unlockedRegions.includes(regionId);
+    const isCurrent = gameData.currentRegion === regionId;
 
-    gameData.currentRegion = regionId;
-    initFarmForRegion(regionId);
-    updateUI();
-    showView('farm');
+    // Marca visual del marcador elegido
+    document.querySelectorAll('#mapLabels .label-group').forEach(g => g.classList.remove('ring-4', 'ring-yellow-300', 'rounded-full'));
+    const marker = document.querySelector(`#mapLabels .label-group[data-region="${regionId}"]`);
+    if (marker) marker.classList.add('ring-4', 'ring-yellow-300', 'rounded-full');
+
+    const panel = document.getElementById('regionInfo');
+    if (panel) {
+        const cropList = region.crops.map(id => {
+            const crop = crops[id];
+            if (!crop) return '';
+            const inSeason = crop.seasons.includes(gameData.season);
+            return `<div class="flex items-center gap-2 bg-black/25 rounded-xl p-2 ${inSeason ? '' : 'opacity-70'}">
+                ${FarmArt.product(id)}
+                <div class="min-w-0">
+                    <p class="text-white text-sm font-bold truncate">${crop.name}</p>
+                    <p class="text-${inSeason ? 'green' : 'gray'}-300 text-[11px]">${inSeason ? '✓ En temporada' : 'Fuera de temporada'}</p>
+                </div>
+            </div>`;
+        }).join('');
+
+        panel.innerHTML = `
+            <div class="flex items-center gap-3 mb-2">
+                <span class="text-3xl">${region.emoji}</span>
+                <div>
+                    <h3 class="title-font text-xl text-yellow-300">${region.name}</h3>
+                    <p class="text-amber-300 text-xs">${FarmWorld.placeLabel(regionId) || ''}</p>
+                </div>
+            </div>
+            <div class="flex items-center justify-between text-xs text-green-200 mb-3">
+                <span>Nivel requerido: <b class="text-white">${region.level}</b></span>
+                <span>Parcelas: <b class="text-white">${gameData.farms[regionId]?.plots.length ?? region.farmSize}</b></span>
+            </div>
+            <h4 class="text-amber-200 text-sm font-bold mb-2">🌱 Cultivos de la zona</h4>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-60 overflow-y-auto pr-1">${cropList}</div>
+            <div class="mt-4">
+                ${unlocked
+                    ? `<button onclick="travelToRegion('${regionId}')" class="w-full ${isCurrent ? 'bg-amber-700 hover:bg-amber-600' : 'bg-green-600 hover:bg-green-500'} text-white px-4 py-3 rounded-xl font-bold transition-all">
+                        ${isCurrent ? '🌾 Ya estás en esta granja' : `🌾 Ir a la granja de ${region.name}`}
+                       </button>`
+                    : `<div class="bg-black/40 rounded-xl p-3 text-center">
+                        <p class="text-red-300 font-bold">🔒 Región bloqueada</p>
+                        <p class="text-gray-300 text-xs mt-1">Alcanza el nivel ${region.level} para desbloquearla (ahora: ${gameData.level})</p>
+                       </div>`}
+            </div>
+        `;
+        panel.querySelectorAll('svg').forEach(svg => svg.classList.add('prod-sprite', 'sm'));
+    }
 }
 
 // Ensure functions are available globally
