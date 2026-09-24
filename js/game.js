@@ -11,10 +11,26 @@ function startGame() {
     document.getElementById('loginChoiceModal').classList.remove('hidden');
 }
 
-function loginWithGoogle() {
-    // Redirigir al servidor Node.js para iniciar el flujo de Google OAuth
-    const authServerUrl = 'http://localhost:3000/auth/google';
-    window.location.href = authServerUrl;
+/* Servidor de autenticación (opcional). Se puede apuntar a otro host con
+   window.ELECTRO_AUTH_URL antes de cargar los scripts. */
+function authServerBase() {
+    if (typeof window.ELECTRO_AUTH_URL === 'string' && window.ELECTRO_AUTH_URL) {
+        return window.ELECTRO_AUTH_URL.replace(/\/+$/, '');
+    }
+    return `${window.location.protocol}//${window.location.hostname}:3000`;
+}
+
+async function loginWithGoogle() {
+    const base = authServerBase();
+    try {
+        // Comprobación rápida: si no hay servidor, avisamos en vez de dejar al
+        // jugador en una página en blanco.
+        await fetch(base + '/auth/user', { method: 'GET', signal: AbortSignal.timeout ? AbortSignal.timeout(2500) : undefined });
+    } catch (e) {
+        showToast('🔐 No hay servidor de autenticación aquí: usa «Jugar en Local»');
+        return;
+    }
+    window.location.href = base + '/auth/google';
 }
 
 function startLocalGame() {
@@ -35,6 +51,7 @@ function startLocalGame() {
     }
 
     updateUI();
+    applyFarmEnvironment(true);
     renderFarm();
     renderShop();
     renderElectroculture();
@@ -99,10 +116,112 @@ function showView(view) {
     else if (view === 'inventory') renderInventory();
 }
 
-function updateFarmBackground() {
+// ============ PAISAJE DE LA GRANJA (FarmWorld) ============
+/* Cada región tiene su escenario real: cielo, sierra, campos y aperos.
+   El paisaje se adapta a la estación y al momento del día. */
+
+const TIME_OF_DAY = [
+    { icon: '☀️', label: 'Día' },
+    { icon: '🌇', label: 'Atardecer' },
+    { icon: '🌙', label: 'Noche' },
+    { icon: '🌅', label: 'Amanecer' }
+];
+
+// Tonos de suelo/hierba por estación (comparten valor con FarmWorld)
+const SEASON_GROUND = {
+    spring: { top: '#86c463', dark: '#69a349' },
+    summer: { top: '#a5bf4d', dark: '#86a13a' },
+    autumn: { top: '#b39a54', dark: '#957e3f' },
+    winter: { top: '#c6d1c9', dark: '#a8b5ad' }
+};
+
+function getTimeOfDay() {
+    return Number.isInteger(gameData.timeOfDay) && TIME_OF_DAY[gameData.timeOfDay] ? gameData.timeOfDay : 0;
+}
+
+function applyFarmEnvironment(force) {
+    const mount = document.getElementById('worldMount');
+    if (!mount || typeof FarmWorld === 'undefined') return;
+
+    const tod = getTimeOfDay();
+    const season = gameData.season;
+    const region = gameData.currentRegion;
+    const ground = SEASON_GROUND[season] || SEASON_GROUND.spring;
+
+    // Altura del paisaje según la pantalla (más bajo en móvil)
+    const worldH = window.innerWidth < 640 ? '250px' : (window.innerWidth < 1024 ? '300px' : '360px');
     const farm = document.getElementById('farmFullscreen');
-    farm.classList.remove('spring', 'summer', 'autumn', 'winter');
-    farm.classList.add(gameData.season);
+    if (farm) farm.style.setProperty('--ground', ground.top);
+
+    const key = `${region}|${season}|${tod}`;
+    const world = mount.querySelector('.farm-world');
+    if (!force && world && mount.dataset.key === key) {
+        // Solo refrescamos medidas y tonos (barato): el paisaje ya está montado
+        world.style.setProperty('--world-h', worldH);
+        world.style.setProperty('--grass', ground.top);
+        world.style.setProperty('--grass-dark', ground.dark);
+        return;
+    }
+    mount.dataset.key = key;
+
+    mount.innerHTML = '';
+    const fresh = FarmWorld.build(region, season, tod);
+    fresh.style.setProperty('--grass', ground.top);
+    fresh.style.setProperty('--grass-dark', ground.dark);
+    fresh.style.setProperty('--world-h', worldH);
+    mount.appendChild(fresh);
+
+    const label = document.getElementById('placeLabel');
+    if (label) label.textContent = FarmWorld.placeLabel(region) || regions[region].name;
+
+    const icon = document.getElementById('todIcon');
+    if (icon) icon.textContent = TIME_OF_DAY[tod].icon;
+    const btn = document.getElementById('todBtn');
+    if (btn) btn.title = `Momento del día: ${TIME_OF_DAY[tod].label} (clic para cambiar)`;
+
+    bindParallax();
+}
+
+// El paisaje se reajusta si cambia el tamaño de la ventana (sin rehacer todo)
+let resizeTimer = null;
+window.addEventListener('resize', () => {
+    clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(() => {
+        if (!document.getElementById('farmView')?.classList.contains('hidden')) applyFarmEnvironment();
+    }, 220);
+});
+
+function cycleTimeOfDay() {
+    gameData.timeOfDay = (getTimeOfDay() + 1) % TIME_OF_DAY.length;
+    applyFarmEnvironment(true);
+    showToast(`${TIME_OF_DAY[gameData.timeOfDay].icon} ${TIME_OF_DAY[gameData.timeOfDay].label} en ${regions[gameData.currentRegion].name}`);
+    saveGame();
+}
+
+// Paralaje muy suave: solo desplaza las capas de paisaje (coste mínimo)
+let parallaxBound = false;
+function bindParallax() {
+    if (parallaxBound) return;
+    parallaxBound = true;
+    let raf = null;
+    window.addEventListener('mousemove', (e) => {
+        if (raf) return;
+        raf = requestAnimationFrame(() => {
+            raf = null;
+            const scale = window.innerWidth < 900 ? 0 : 1;
+            if (!scale) return;
+            const nx = (e.clientX / window.innerWidth - 0.5);
+            const layers = document.querySelectorAll('#worldMount .w-layer');
+            layers.forEach((el, i) => {
+                const k = [10, 18, 26][i] || 14;
+                el.style.setProperty('--px', `${(-nx * k).toFixed(1)}px`);
+            });
+        });
+    }, { passive: true });
+}
+
+function updateFarmBackground() {
+    applyFarmEnvironment();
 }
 
 // ============ UI ============
@@ -181,117 +300,108 @@ function renderFarm() {
     if (!grid) return;
     grid.innerHTML = '';
 
-    // Tractor Arado Button Logic
+    // Botón "Arar todo" (solo con tractor de arado)
     if (gameData.inventory.tools.tractorArado) {
-        let btn = document.getElementById('plowAllBtn');
-        // Only create if not exists or if checking where to place. 
-        // Actually, since renderFarm is called often, we should be careful not to duplicate or keep re-inserting if it persists outside grid.
-        // But since we are inside renderFarm, let's just ensure we have the container.
-
-        // Better approach: Add it to a container OUTSIDE the grid, but handled here.
-        const container = document.getElementById('farmView'); // Check if we have this
-        if (container) {
-            let btnContainer = document.getElementById('farmControlsContainer');
-            if (!btnContainer) {
-                const header = container.querySelector('h2') || container.firstElementChild;
-                if (header) {
-                    btnContainer = document.createElement('div');
-                    btnContainer.id = 'farmControlsContainer';
-                    btnContainer.className = 'flex justify-end px-4 mb-2';
-                    header.parentNode.insertBefore(btnContainer, header.nextSibling);
-                }
+        let btnContainer = document.getElementById('farmControlsContainer');
+        if (!btnContainer) {
+            const field = document.querySelector('#farmView .field-area');
+            if (field) {
+                btnContainer = document.createElement('div');
+                btnContainer.id = 'farmControlsContainer';
+                btnContainer.className = 'flex justify-end mb-3';
+                field.insertBefore(btnContainer, field.firstElementChild);
             }
-
-            if (btnContainer) {
-                if (!document.getElementById('plowAllBtn')) {
-                    btnContainer.innerHTML = `
-                        <button id="plowAllBtn" onclick="plowAll()" class="bg-amber-600 hover:bg-amber-500 text-white px-4 py-2 rounded-lg font-bold shadow-lg flex items-center gap-2 transform active:scale-95 transition-all">
-                            🚜 Arar Todo (10⚡)
-                        </button>
-                     `;
-                }
-            }
+        }
+        if (btnContainer && !document.getElementById('plowAllBtn')) {
+            btnContainer.innerHTML = `
+                <button id="plowAllBtn" onclick="plowAll()" class="bg-amber-600 hover:bg-amber-500 text-white px-4 py-2 rounded-lg font-bold shadow-lg flex items-center gap-2 transform active:scale-95 transition-all">
+                    🚜 Arar Todo (10⚡)
+                </button>`;
         }
     }
 
     const farm = gameData.farms[gameData.currentRegion];
     if (!farm) return;
 
+    const hasElectro = Object.values(gameData.electroculture).some(v => v);
+    const stageIcons = ['🌱', '🌿', '🍃', '✨'];
+
     farm.plots.forEach((plot, index) => {
         const cell = document.createElement('div');
-        // Added 'select-none' and 'touch-manipulation' for mobile
-        cell.className = 'farm-plot w-16 h-16 sm:w-18 sm:h-18 md:w-20 md:h-20 flex items-center justify-center cursor-pointer relative transition-all duration-300 select-none touch-manipulation';
+        cell.className = 'farm-plot w-14 h-14 sm:w-20 sm:h-20 md:w-24 md:h-24 relative cursor-pointer select-none touch-manipulation';
 
-        // Touch handling helpers
-        const handleStart = (e) => {
-            if (e.type === 'touchstart') e.preventDefault(); // Prevent text selection/scrolling on long press
+        // --- Helpers de interacción (mantener pulsado) ---
+        const begin = (e) => {
+            if (e.type === 'touchstart') e.preventDefault();
             if (plot.planted && !plot.ready) startSpraying(index, e);
             else if (!plot.planted && !plot.plowed) startPlowing(index);
         };
-        const handleEnd = (e) => {
+        const end = () => {
             if (plot.planted && !plot.ready) stopSpraying();
             else if (!plot.planted && !plot.plowed) stopPlowing();
         };
+        cell.addEventListener('mousedown', begin);
+        cell.addEventListener('mouseup', end);
+        cell.addEventListener('mouseleave', end);
+        cell.addEventListener('touchstart', begin, { passive: false });
+        cell.addEventListener('touchend', end);
+        cell.addEventListener('touchcancel', end);
 
         if (plot.planted) {
             const crop = crops[plot.planted];
-            const progress = Math.min(plot.daysGrown / getGrowTime(plot.planted), 1);
+            const growTime = getGrowTime(plot.planted);
+            const progress = Math.min(plot.daysGrown / growTime, 1);
+            const stage = FarmArt.stageFor(progress, plot.ready);
 
             cell.classList.add('planted');
             if (plot.watered) cell.classList.add('watered');
+            cell.classList.add(plot.ready ? 'ready' : 'growing');
+
+            const art = FarmArt.plant(plot.planted, stage);
+            const daysLeft = Math.max(0, Math.ceil(growTime - plot.daysGrown));
+            cell.innerHTML = `
+                <div class="spr-wrap ${hasElectro ? 'electro-glow' : ''}">${art}</div>
+                <div class="plot-stage">${plot.ready ? '✨' : stageIcons[stage]}</div>
+                <div class="plot-badge">${plot.ready
+                    ? `${plot.yieldAmount.toFixed(1)}${crop.unit}`
+                    : `${Math.floor(progress * 100)}%`}</div>
+            `;
+            cell.title = plot.ready
+                ? `${crop.name} — ¡LISTO PARA COSECHAR! ${plot.yieldAmount.toFixed(1)} ${crop.unit}`
+                : `${crop.name} — ${Math.floor(progress * 100)}% (${daysLeft} día${daysLeft === 1 ? '' : 's'} restante${daysLeft === 1 ? '' : 's'})`;
 
             if (plot.ready) {
-                cell.classList.add('ready');
-                const hasElectro = Object.values(gameData.electroculture).some(v => v);
-                cell.innerHTML = `
-                    <div class="plant-icon plant-sway text-3xl md:text-4xl ${hasElectro ? 'electro-glow' : ''}">${crop.emoji}</div>
-                    <div class="yield-badge">${plot.yieldAmount.toFixed(1)}${crop.unit}</div>
-                `;
-                cell.title = `${crop.name} - ¡LISTO! ${plot.yieldAmount.toFixed(1)} ${crop.unit}`;
-                cell.onclick = () => startFullHarvest(index);
-                // Also handle touch for harvest
-                cell.ontend = (e) => { e.preventDefault(); startFullHarvest(index); };
+                cell.onclick = (e) => { e.stopPropagation(); startFullHarvest(index); };
+                cell.ontouchend = (e) => { e.preventDefault(); e.stopPropagation(); startFullHarvest(index); };
             } else {
-                const hasElectro = Object.values(gameData.electroculture).some(v => v);
-                const stageEmoji = progress < 0.3 ? '🌱' : (progress < 0.6 ? '🌿' : '🌳');
-
-                cell.innerHTML = `
-                    <div class="plant-icon plant-sway text-2xl md:text-3xl ${hasElectro ? 'electro-glow' : ''}">${stageEmoji}</div>
-                    <div class="growth-bar"><div class="growth-bar-fill" style="width: ${progress * 100}%"></div></div>
-                `;
-                cell.title = `${crop.name} - ${Math.floor(progress * 100)}% (${Math.ceil(getGrowTime(plot.planted) - plot.daysGrown)} días restantes)`;
-
-                cell.onmousedown = (e) => startSpraying(index, e);
-                cell.onmouseup = stopSpraying;
-                cell.onmouseleave = stopSpraying;
-
-                // Mobile events
-                cell.ontouchstart = (e) => { e.preventDefault(); startSpraying(index, e); };
-                cell.ontouchend = stopSpraying;
-                cell.ontouchcancel = stopSpraying;
+                cell.onclick = (e) => { e.stopPropagation(); if (!plot.watered) waterPlot(index); };
+                cell.ontouchend = end;
             }
         } else if (plot.plowed) {
-            const soilColor = regions[gameData.currentRegion].soilColor || '#5d4037';
+            const soilColor = regions[gameData.currentRegion].soilColor || '#7d5527';
             cell.classList.add('plowed');
-            cell.style.backgroundColor = soilColor;
-            cell.innerHTML = '<span class="text-amber-200/50 text-3xl font-bold">✨</span>';
-            cell.title = 'Parcela arada - Clic para plantar';
-            cell.onclick = () => openPlantModal(index);
+            cell.style.background = `linear-gradient(160deg, ${soilColor}, #4f3417)`;
+            cell.innerHTML = `
+                <div class="spr-wrap" style="align-items:center">
+                    <span style="font-size:26px;opacity:.55">🕳️</span>
+                </div>
+                <div class="plot-stage">➕</div>`;
+            cell.title = 'Parcela arada — toca para plantar';
+            cell.onclick = (e) => { e.stopPropagation(); openPlantModal(index); };
             cell.ontouchend = (e) => { e.preventDefault(); openPlantModal(index); };
         } else {
-            cell.classList.add('unplowed');
-            cell.innerHTML = '<span class="text-white/20 text-3xl font-bold">🍂</span>';
-            cell.title = 'Tierra sin arar - Mantén 0.5s para arar'; // Updated title
-
-            // Mouse events
-            cell.onmousedown = () => startPlowing(index);
-            cell.onmouseup = stopPlowing;
-            cell.onmouseleave = stopPlowing;
-
-            // Touch events
-            cell.ontouchstart = (e) => { e.preventDefault(); startPlowing(index); };
-            cell.ontouchend = stopPlowing;
-            cell.ontouchcancel = stopPlowing;
+            cell.classList.add('unplowed', 'empty-hint');
+            cell.innerHTML = `
+                <div class="spr-wrap" style="align-items:center">
+                    <span style="font-size:22px;opacity:.45">🪨</span>
+                </div>`;
+            cell.title = 'Tierra sin arar — mantén pulsado 0.5 s para arar (5⚡)';
+            cell.onclick = (e) => {
+                e.stopPropagation();
+                if (!gameData.farms[gameData.currentRegion].plots[index].plowed) {
+                    showToast('✋ Mantén pulsado para arar la tierra');
+                }
+            };
         }
 
         grid.appendChild(cell);
@@ -313,15 +423,16 @@ function renderSeeds() {
             const inSeason = crop.seasons.includes(gameData.season) || gameData.inventory.tools.invernadero;
 
             const item = document.createElement('div');
-            item.className = `p-2 rounded-lg flex items-center gap-2 ${inSeason ? 'bg-green-800/80' : 'bg-gray-700/80'}`;
+            item.className = `seed-chip p-2 flex items-center gap-2 ${inSeason ? 'bg-green-800/80' : 'bg-gray-700/80'}`;
             item.innerHTML = `
-                <span class="text-xl">${crop.emoji}</span>
+                ${FarmArt.product(seedId)}
                 <div class="flex-1 min-w-0">
                     <p class="text-white text-xs font-bold truncate">${crop.name}</p>
                     <p class="text-xs ${inSeason ? 'text-green-300' : 'text-red-300'}">${inSeason ? '✓ En temporada' : '✗ Fuera temp.'}</p>
                 </div>
                 <span class="text-yellow-300 font-bold">${qty}</span>
             `;
+            item.querySelector('svg').classList.add('prod-sprite', 'sm');
             list.appendChild(item);
         }
     });
@@ -348,7 +459,8 @@ function renderQuickInventory() {
         total += value;
         const item = document.createElement('div');
         item.className = 'flex items-center gap-1 text-white';
-        item.innerHTML = `<span>${crop.emoji}</span><span class="truncate flex-1 text-xs">${crop.name}</span><span class="text-yellow-300 text-xs">${qty.toFixed(1)}${crop.unit}</span>`;
+        item.innerHTML = `${FarmArt.product(cropId)}<span class="truncate flex-1 text-xs">${crop.name}</span><span class="text-yellow-300 text-xs">${qty.toFixed(1)}${crop.unit}</span>`;
+        item.querySelector('svg').classList.add('prod-sprite', 'sm');
         container.appendChild(item);
     });
 
@@ -374,7 +486,7 @@ function openPlantModal(index) {
             btn.className = `w-full p-3 rounded-lg ${inSeason ? 'bg-green-700 hover:bg-green-600' : 'bg-gray-700 opacity-60 cursor-not-allowed'} flex items-center gap-3 transition-all`;
             btn.disabled = !inSeason;
             btn.innerHTML = `
-                <span class="text-3xl">${crop.emoji}</span>
+                ${FarmArt.product(seedId)}
                 <div class="flex-1 text-left">
                     <p class="text-white font-bold">${crop.name}</p>
                     <p class="text-green-300 text-xs">🌱 ${crop.description}</p>
@@ -385,6 +497,7 @@ function openPlantModal(index) {
                     <p class="text-gray-400 text-xs">semillas</p>
                 </div>
             `;
+            btn.querySelector('svg').classList.add('prod-sprite', 'lg');
             btn.onclick = () => plantSeed(seedId);
             container.appendChild(btn);
         }
@@ -401,7 +514,7 @@ function closePlantModal() {
 
 function plantSeed(seedId) {
     if (gameData.energy < 5) {
-        alert('¡No tienes suficiente energía! Juega minijuegos o descansa.');
+        showToast('⚡ ¡No tienes suficiente energía! Juega un minijuego o pasa el día.');
         return;
     }
 
@@ -435,15 +548,6 @@ function plantSeed(seedId) {
     saveGame();
 }
 
-function interactPlot(index) {
-    const farm = gameData.farms[gameData.currentRegion];
-    const plot = farm.plots[index];
-    if (!plot.planted) return;
-
-    if (plot.ready) harvestPlot(index);
-    else if (!plot.watered && gameData.energy >= 2) waterPlot(index);
-}
-
 function waterPlot(index) {
     const cost = gameData.inventory.tools.regadera ? 1 : 2;
     if (gameData.energy < cost) return;
@@ -458,7 +562,7 @@ function waterPlot(index) {
 function waterAll() {
     const cost = gameData.inventory.tools.regadera ? 5 : 10;
     if (gameData.energy < cost) {
-        alert('¡No tienes suficiente energía!');
+        showToast('⚡ ¡No tienes suficiente energía!');
         return;
     }
 
@@ -469,6 +573,7 @@ function waterAll() {
     gameData.energy = Math.max(0, gameData.energy - cost);
     renderFarm();
     updateUI();
+    saveGame();
 }
 
 function harvestPlot(index) {
@@ -490,6 +595,7 @@ function harvestPlot(index) {
     renderFarm();
     renderQuickInventory();
     updateUI();
+    saveGame();
 }
 
 function harvestAll() {
@@ -501,7 +607,7 @@ function harvestAll() {
 
 function expandFarm() {
     if (gameData.money < 500) {
-        alert('¡Necesitas 500💰 para expandir!');
+        showToast('💰 Necesitas 500 para ampliar el campo');
         return;
     }
 
@@ -544,10 +650,44 @@ function advanceDay() {
 
     gameData.energy = Math.min(gameData.maxEnergy, gameData.energy + 35);
 
-    updateFarmBackground();
+    updateFarmBackground(true);
     renderFarm();
     updateUI();
+    showToast(`📅 Día ${gameData.day} · ${gameData.season === 'autumn' ? '🍂 Otoño' : gameData.season === 'winter' ? '❄️ Invierno' : gameData.season === 'spring' ? '🌸 Primavera' : '☀️ Verano'}`);
     saveGame();
+}
+
+// Celebración de subida de nivel (tarjeta efímera, sin bloquear el juego)
+function showLevelUp(level, regionId) {
+    let box = document.getElementById('levelUpCard');
+    if (box) box.remove();
+    box = document.createElement('div');
+    box.id = 'levelUpCard';
+    box.className = 'level-up-card';
+    box.innerHTML = `
+        <div class="title-font text-3xl text-yellow-300 mb-1">✨ ¡Nivel ${level}! ✨</div>
+        ${regionId ? `<p class="text-green-200">Nueva región desbloqueada:<br><b class="text-white">${regions[regionId].name} ${regions[regionId].emoji}</b></p>` : '<p class="text-green-200">¡Tu granja mejora!</p>'}
+        <button onclick="this.parentElement.remove()" class="mt-3 bg-green-600 hover:bg-green-500 text-white px-5 py-2 rounded-xl font-bold">Seguir</button>`;
+    document.body.appendChild(box);
+    setTimeout(() => box && box.remove(), 6000);
+}
+
+// Aviso breve y no intrusivo (sustituye a los alert en acciones de juego)
+function showToast(message, kind) {
+    let host = document.getElementById('toastHost');
+    if (!host) {
+        host = document.createElement('div');
+        host.id = 'toastHost';
+        document.body.appendChild(host);
+    }
+    const toast = document.createElement('div');
+    toast.className = 'toast' + (kind ? ' toast-' + kind : '');
+    toast.textContent = message;
+    host.appendChild(toast);
+    setTimeout(() => {
+        toast.classList.add('toast-out');
+        setTimeout(() => toast.remove(), 400);
+    }, 2200);
 }
 
 // ============ CÁLCULOS ============
@@ -585,9 +725,11 @@ function gainXP(amount, event) {
         const regionOrder = Object.keys(regions);
         if (gameData.level <= regionOrder.length) {
             const newRegion = regionOrder[gameData.level - 1];
-            gameData.unlockedRegions.push(newRegion);
+            if (!gameData.unlockedRegions.includes(newRegion)) gameData.unlockedRegions.push(newRegion);
             initFarmForRegion(newRegion);
-            alert(`✨ ¡NIVEL ${gameData.level} ALCANZADO! ✨\n\nHas desbloqueado una nueva región: ${regions[newRegion].name} ${regions[newRegion].emoji}\n¡Nuevos cultivos te esperan!`);
+            showLevelUp(gameData.level, newRegion);
+        } else {
+            showLevelUp(gameData.level);
         }
     }
     saveGame();
@@ -651,10 +793,11 @@ function renderInventory() {
             const item = document.createElement('div');
             item.className = 'inventory-item flex flex-col items-center p-3 bg-white/10 rounded-xl';
             item.innerHTML = `
-                <span class="text-3xl">${crop.emoji}</span>
-                <p class="text-amber-900 font-bold text-sm">${crop.name}</p>
-                <p class="text-amber-700 text-xs font-bold text-lg">${qty}</p>
+                ${FarmArt.product(seedId)}
+                <p class="text-amber-100 font-bold text-sm">${crop.name}</p>
+                <p class="text-amber-300 text-xs font-bold text-lg">${qty}</p>
             `;
+            item.querySelector('svg').classList.add('prod-sprite');
             grid.appendChild(item);
         });
     }
@@ -675,15 +818,16 @@ function renderInventory() {
             const item = document.createElement('div');
             item.className = 'inventory-item flex flex-col items-center p-3 bg-white/10 rounded-xl opacity-80';
             item.innerHTML = `
-                <span class="text-3xl">${crop.emoji}</span>
-                <p class="text-amber-900 font-bold text-sm">${crop.name}</p>
-                <p class="text-amber-700 text-xs">${qty.toFixed(1)} ${crop.unit}</p>
+                ${FarmArt.product(cropId)}
+                <p class="text-amber-100 font-bold text-sm">${crop.name}</p>
+                <p class="text-amber-300 text-xs">${qty.toFixed(1)} ${crop.unit}</p>
                 <button onclick="recycleHarvest('${cropId}')" 
                     class="mt-2 w-full bg-blue-600 hover:bg-blue-500 text-white text-[10px] py-1 rounded font-bold transition-all"
                     title="Reciclar por semillas">
                     ♻️ Reciclar
                 </button>
             `;
+            item.querySelector('svg').classList.add('prod-sprite');
             grid.appendChild(item);
         });
     }
@@ -741,7 +885,7 @@ function sellAll() {
 function plowAll() {
     const cost = 10;
     if (gameData.energy < cost) {
-        alert('¡Energía insuficiente! Necesitas 10⚡');
+        showToast('⚡ Necesitas 10 de energía para arar todo');
         return;
     }
 
@@ -761,9 +905,9 @@ function plowAll() {
         updateUI();
         saveGame();
         // Visual feedback?
-        alert(`🚜 ¡Tractor en marcha! Has arado ${plowedCount} parcelas.`);
+        showToast(`🚜 ¡Tractor en marcha! ${plowedCount} parcelas aradas`);
     } else {
-        alert('No hay parcelas vacías para arar.');
+        showToast('🚜 No hay parcelas vacías que arar');
     }
 }
 
@@ -787,7 +931,7 @@ function recycleHarvest(cropId) {
         // If they leave it empty, it might be nice to do all.
         if (input.trim() === '') amountToRecycle = qty;
         else {
-            alert('Cantidad inválida.');
+            showToast('⚠️ Cantidad inválida');
             return;
         }
     }
@@ -797,7 +941,7 @@ function recycleHarvest(cropId) {
     const seedsGained = Math.floor(amountToRecycle * baseSeedsPerUnit * gameData.recyclingBonus);
 
     if (seedsGained <= 0) {
-        alert('Cantidad insuficiente para generar semillas.');
+        showToast('⚠️ Cantidad insuficiente para generar semillas');
         return;
     }
 
@@ -807,7 +951,7 @@ function recycleHarvest(cropId) {
         gameData.inventory.harvests[cropId] -= amountToRecycle;
         if (gameData.inventory.harvests[cropId] <= 0.01) delete gameData.inventory.harvests[cropId];
 
-        alert(`♻️ ¡Reciclaje completado! Has obtenido ${seedsGained} semillas de ${crop.name}.`);
+        showToast(`♻️ ¡${seedsGained} semillas de ${crop.name} obtenidas!`);
 
         updateUI();
         renderInventory();
@@ -844,7 +988,9 @@ function travelToRegion(regionId) {
     initFarmForRegion(regionId);
     closeRegionModal();
     showView('farm');
+    applyFarmEnvironment(true);
     updateUI();
+    showToast(`🚚 Te has mudado a ${regions[regionId].name}`);
     saveGame();
 }
 
@@ -896,7 +1042,7 @@ function renderShopSell() {
         item.className = 'bg-black/20 p-3 rounded-lg flex items-center justify-between';
         item.innerHTML = `
             <div class="flex items-center gap-2">
-                <span class="text-2xl">${crop.emoji}</span>
+                ${FarmArt.product(cropId)}
                 <div>
                      <p class="text-white text-sm font-bold">${crop.name}</p>
                      <p class="text-xs text-gray-300">${qty.toFixed(1)} ${crop.unit}</p>
@@ -906,6 +1052,7 @@ function renderShopSell() {
                 +${price}💰
             </button>
         `;
+        item.querySelector('svg').classList.add('prod-sprite');
         list.appendChild(item);
     });
 
@@ -1016,7 +1163,7 @@ function renderShopSeeds() {
         item.className = `p-3 rounded-lg ${inSeason ? 'bg-green-800/60' : 'bg-gray-700/60'}`;
         item.innerHTML = `
             <div class="flex items-center gap-2 mb-2">
-                <span class="text-2xl">${crop.emoji}</span>
+                ${FarmArt.product(cropId)}
                 <div class="flex-1">
                     <p class="text-white font-bold text-sm">${crop.name}</p>
                     <p class="text-xs ${inSeason ? 'text-green-300' : 'text-gray-400'}">${inSeason ? '✓ En temporada' : 'Fuera de temporada'}</p>
@@ -1030,6 +1177,7 @@ function renderShopSeeds() {
                 </button>
             </div>
         `;
+        item.querySelector('svg').classList.add('prod-sprite');
         container.appendChild(item);
     });
 }
@@ -1088,7 +1236,7 @@ function renderShopElectro() {
 function buySeed(cropId) {
     const crop = crops[cropId];
     if (gameData.money < crop.seedPrice) {
-        alert('¡Dinero insuficiente!');
+        showToast('💸 ¡Dinero insuficiente!');
         return;
     }
 
@@ -1112,7 +1260,7 @@ function buySeed(cropId) {
 function buyTool(toolId) {
     const tool = tools[toolId];
     if (gameData.money < tool.price) {
-        alert('¡Dinero insuficiente!');
+        showToast('💸 ¡Dinero insuficiente!');
         return;
     }
 
@@ -1128,14 +1276,14 @@ function buyTool(toolId) {
 
 function buyElectro(eqId) {
     const eq = electroEquipment[eqId];
-    if (gameData.money < item.price) {
-        alert('¡Dinero insuficiente!');
+    if (gameData.money < eq.price) {
+        showToast('💸 ¡Dinero insuficiente!');
         return;
     }
 
     // Track Stats
     if (gameData.regionStats && gameData.regionStats[gameData.currentRegion]) {
-        gameData.regionStats[gameData.currentRegion].invested += item.price;
+        gameData.regionStats[gameData.currentRegion].invested += eq.price;
     }
     gameData.money -= eq.price;
     gameData.electroculture[eqId] = true;
@@ -1204,7 +1352,7 @@ function startMinigame(type) {
     const energyCost = isFree ? 0 : costs[type];
 
     if (gameData.energy < energyCost) {
-        alert('¡Energía insuficiente!');
+        showToast('⚡ ¡Energía insuficiente!');
         return;
     }
 
@@ -1385,7 +1533,8 @@ function endMinigame() {
     if (isFree && minigameScore < 200) reward = "¡Puntos insuficientes para el premio diario (necesitas 200)!";
 
     setTimeout(() => {
-        alert(`🎉 ¡Juego terminado!\n\nPuntos: ${minigameScore}\nRecompensa: ${reward}\n\nJuegos diarios gratuitos restantes: ${Math.max(0, 3 - gameData.minigames.playedToday)}`);
+        const gratis = Math.max(0, 3 - gameData.minigames.playedToday);
+        showToast(`🎉 ${minigameScore} puntos · ${reward} · ${gratis} partida${gratis === 1 ? '' : 's'} gratis hoy`);
         closeMinigame();
         updateUI();
         saveGame();
@@ -1485,7 +1634,7 @@ function showGuide() {
 // ============ NUEVAS INTERACCIONES ============
 function startPlowing(index) {
     if (gameData.energy < 5) {
-        alert('¡Energía insuficiente!');
+        showToast('⚡ ¡Energía insuficiente!');
         return;
     }
     gameData.isHolding = true;
@@ -1536,6 +1685,7 @@ function finishPlowing(index) {
     gameData.energy = Math.max(0, gameData.energy - 5);
     renderFarm();
     updateUI();
+    saveGame();
 }
 
 function startSpraying(index, event) {
@@ -1551,6 +1701,7 @@ function startSpraying(index, event) {
 
     updateHosePosition(event);
     document.addEventListener('mousemove', updateHosePosition);
+    document.addEventListener('touchmove', updateHosePosition, { passive: true });
 
     let progress = 0;
     sprayTimer = setInterval(() => {
@@ -1564,10 +1715,13 @@ function startSpraying(index, event) {
 
 function updateHosePosition(e) {
     const hose = document.getElementById('hoseEffect');
-    if (hose) {
-        hose.style.left = e.clientX + 'px';
-        hose.style.top = e.clientY + 'px';
-    }
+    if (!hose) return;
+    const touch = e.touches && e.touches[0] ? e.touches[0] : (e.changedTouches && e.changedTouches[0] ? e.changedTouches[0] : null);
+    const x = touch ? touch.clientX : e.clientX;
+    const y = touch ? touch.clientY : e.clientY;
+    if (typeof x !== 'number' || typeof y !== 'number') return;
+    hose.style.left = x + 'px';
+    hose.style.top = y + 'px';
 }
 
 function stopSpraying() {
@@ -1576,14 +1730,17 @@ function stopSpraying() {
     document.body.classList.remove('spray-cursor');
     document.getElementById('hoseEffect')?.remove();
     document.removeEventListener('mousemove', updateHosePosition);
+    document.removeEventListener('touchmove', updateHosePosition);
 }
 
 function finishWatering(index) {
     const cost = gameData.inventory.tools.regadera ? 1 : 2;
-    gameData.farms[gameData.currentRegion].plots[index].watered = true;
+    const plot = gameData.farms[gameData.currentRegion].plots[index];
     gameData.energy = Math.max(0, gameData.energy - cost);
+    plot.watered = true;
     renderFarm();
     updateUI();
+    saveGame();
 }
 
 function startFullHarvest(index) {
@@ -1591,32 +1748,41 @@ function startFullHarvest(index) {
     const crop = crops[plot.planted];
 
     document.getElementById('harvestOverlay').classList.remove('hidden');
-    document.getElementById('harvestTitle').textContent = `🍎 Cosechando ${crop.name}`;
+    document.getElementById('harvestTitle').textContent = `🧺 Cosechando ${crop.name}`;
+    const desc = document.getElementById('harvestDesc');
+    if (desc) desc.textContent = `Toca cada ${crop.name.toLowerCase()} para llenar la cesta`;
     const area = document.getElementById('harvestFruitArea');
     area.innerHTML = '';
 
-    collectedFruits = 0;
-    const totalToCollect = Math.ceil(plot.yieldAmount);
-    document.getElementById('collectedCount').textContent = '0';
-    document.getElementById('totalToCollect').textContent = ` / ${totalToCollect}`;
+    // Rendimientos altos se representan con una muestra (no saturamos el DOM)
+    const total = plot.yieldAmount;
+    const shown = Math.min(18, Math.max(3, Math.round(total)));
+    const perFruit = total / shown;
 
-    for (let i = 0; i < totalToCollect; i++) {
+    harvestFruits = [];
+    collectedFruits = 0;
+    document.getElementById('collectedCount').textContent = '0';
+    document.getElementById('totalToCollect').textContent = ` / ${total.toFixed(1)} ${crop.unit}`;
+
+    const art = FarmArt.product(plot.planted);
+    for (let i = 0; i < shown; i++) {
         const fruit = document.createElement('div');
         fruit.className = 'harvest-fruit';
-        fruit.textContent = crop.emoji;
-        fruit.style.left = Math.random() * 80 + 10 + '%';
-        fruit.style.top = Math.random() * 80 + 10 + '%';
+        fruit.innerHTML = art;
+        fruit.querySelector('svg').classList.add('prod-sprite', 'lg');
+        fruit.style.left = (8 + (i % 6) * 15 + Math.random() * 4) + '%';
+        fruit.style.top = (6 + Math.floor(i / 6) * 24 + Math.random() * 5) + '%';
         fruit.style.position = 'absolute';
-        fruit.style.animationDelay = (Math.random() * 2) + 's';
+        fruit.style.animationDelay = (Math.random() * 2).toFixed(2) + 's';
 
         fruit.onclick = () => {
-            if (!fruit.classList.contains('picked')) {
-                fruit.classList.add('picked');
-                collectedFruits++;
-                document.getElementById('collectedCount').textContent = collectedFruits;
-                if (collectedFruits >= totalToCollect) {
-                    setTimeout(() => finishFullHarvest(index, totalToCollect), 600);
-                }
+            if (fruit.classList.contains('picked')) return;
+            fruit.classList.add('picked');
+            collectedFruits++;
+            const recogido = Math.min(total, collectedFruits * perFruit);
+            document.getElementById('collectedCount').textContent = recogido.toFixed(1);
+            if (collectedFruits >= shown) {
+                setTimeout(() => finishFullHarvest(index, total), 500);
             }
         };
         area.appendChild(fruit);
@@ -1717,7 +1883,7 @@ function renderCalendar() {
 
             card.innerHTML = `
                 <div class="flex items-center gap-3 mb-3">
-                    <span class="text-4xl">${crop.emoji}</span>
+                    ${FarmArt.product(cropId)}
                     <div>
                         <h3 class="text-white font-bold text-lg">${crop.name}</h3>
                         <p class="text-green-300 text-xs">${crop.description}</p>
@@ -1743,6 +1909,7 @@ function renderCalendar() {
                     </div>
                 </div>
             `;
+            card.querySelector('svg').classList.add('prod-sprite', 'lg');
         } else {
             card.innerHTML = `
                 <div class="flex items-center justify-center h-32 opacity-50">
@@ -1819,7 +1986,7 @@ function updateVolume(value) {
 function saveSettings() {
     localStorage.setItem('electrocultivo_settings', JSON.stringify(gameSettings));
     closeOptions();
-    alert('✅ Ajustes guardados');
+    showToast('✅ Ajustes guardados');
 }
 
 function loadSettings() {
@@ -1850,7 +2017,8 @@ function saveGame() {
         electroculture: gameData.electroculture,
         unlockedCrops: gameData.unlockedCrops,
         minigames: gameData.minigames,
-        regionStats: gameData.regionStats
+        regionStats: gameData.regionStats,
+        timeOfDay: gameData.timeOfDay
     };
 
     localStorage.setItem('electrocultivo_save', JSON.stringify(saveObject));
@@ -1891,6 +2059,7 @@ function loadGame() {
             }
 
             gameData.unlockedCrops = parsed.unlockedCrops ?? [];
+            gameData.timeOfDay = Number.isInteger(parsed.timeOfDay) ? parsed.timeOfDay : 0;
             gameData.minigames = parsed.minigames ?? { playedToday: 0, lastReset: new Date().toISOString().split('T')[0] };
 
             // Migración: Stats de región
@@ -1899,7 +2068,7 @@ function loadGame() {
             console.log('Juego cargado correctamente');
         } catch (e) {
             console.error('Error al cargar partida:', e);
-            alert('Hubo un error al cargar tu partida guardada. Se iniciará una nueva.');
+            showToast('⚠️ No se pudo cargar la partida: empezamos de nuevo');
             initGame(); // Reiniciar si falla
         }
     } else {

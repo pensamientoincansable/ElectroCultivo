@@ -11,7 +11,9 @@ const supabaseUrl = process.env.SUPABASE_URL;
 const supabaseKey = process.env.SUPABASE_KEY;
 const supabase = createClient(supabaseUrl, supabaseKey);
 
-app.use(cors());
+// CORS: abierto en desarrollo; restringido al front-end si se define FRONTEND_URL
+const allowedOrigin = process.env.FRONTEND_URL;
+app.use(cors(allowedOrigin ? { origin: allowedOrigin, credentials: true } : {}));
 app.use(express.json());
 
 // 1. Iniciar Autenticación con Google
@@ -67,7 +69,7 @@ app.post('/auth/logout', async (req, res) => {
     res.json({ message: 'Sesión cerrada' });
 });
 
-app.listen(port, () => {
-    console.log(`🚀 Servidor de Autenticación corriendo en http://localhost:${port}`);
-    console.log(`🔗 Token Google configurado con Supabase Key: ${supabaseKey.substring(0, 8)}...`);
+app.listen(port, '0.0.0.0', () => {
+    console.log(`🚀 Servidor de autenticación escuchando en el puerto ${port} (0.0.0.0)`);
+    console.log(`🔗 Supabase configurado con la clave ${String(supabaseKey).substring(0, 8)}...`);
 });
