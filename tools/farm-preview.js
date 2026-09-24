@@ -167,6 +167,6 @@ list.slice(0, NARROW ? 1 : 4).forEach((cid, i) => {
 });
 svg += `</svg>`;
 
-fs.writeFileSync(out.replace(/\.png$/, '.svg'), svg);
+if (process.env.KEEP_SVG) fs.writeFileSync(out.replace(/\.png$/, '.svg'), svg);
 fs.writeFileSync(out, new Resvg(svg, { fitTo: { mode: 'zoom', value: 1 } }).render().asPng());
 console.log('escrito', out);
